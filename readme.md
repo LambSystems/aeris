@@ -142,10 +142,10 @@ Aeris is a sustainability project because it focuses on:
 
 ## Team
 
-- **Chau** — Frontend
-- **Gallo** — Data / Computer Vision
-- **Shuja** — Agentic / Data / Policy Logic
-- **Piero** — Backend / API
+- **Chau** - Frontend
+- **Gallo** - Data / Computer Vision
+- **Shuja** - Agentic / Data / Policy Logic
+- **Piero** - Backend / API
 
 ---
 
@@ -153,19 +153,91 @@ Aeris is a sustainability project because it focuses on:
 
 ```text
 aeris/
-├── README.md
-├── docs/
-│   ├── product.md
-│   ├── architecture.md
-│   ├── mvp.md
-│   ├── data.md
-│   └── demo.md
-├── frontend/
-├── backend/
-├── cv/
-├── data/
-└── scripts/
-````
+|-- README.md
+|-- docs/
+|   |-- product.md
+|   |-- architecture.md
+|   |-- mvp.md
+|   |-- data.md
+|   |-- demo.md
+|   |-- stack.md
+|   `-- interface-concept.md
+|-- frontend/
+|-- backend/
+`-- data/
+```
+
+---
+
+## Quick Start
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Backend:
+
+```text
+http://localhost:8000
+```
+
+API docs:
+
+```text
+http://localhost:8000/docs
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:5173
+```
+
+The frontend falls back to mock data if the backend is not running.
+
+---
+
+## Build Priorities
+
+### Piero / Backend
+
+* keep the FastAPI contract stable
+* wire YOLO output into `backend/app/cv/yolo_service.py`
+* keep fixture fallback working
+* keep deterministic policy ranking inspectable
+
+### Chau / Frontend
+
+* use `docs/interface-concept.md` as the source of truth
+* Lovable can generate the first UI pass
+* keep the app as a single demo screen
+* replace mock data with backend API calls
+
+### Gallo / CV
+
+* prioritize YOLO over Boxer
+* output the normalized scene schema used by the backend
+* do not block the demo if live CV is unstable
+
+### Shuja / Data + Policy
+
+* refine CASTNET-derived profile data
+* improve policy weights and reason tags
+* keep explanations tied to deterministic policy output
 
 ---
 

@@ -1,0 +1,23 @@
+[
+  {
+    "location": "Outdoor Garden Demo",
+    "castnet_site": "Demo CASTNET Profile",
+    "pollution_profile": {
+      "ozone_risk": "high",
+      "deposition_risk": "medium"
+    },
+    "risk_mode": "protect_plants_and_sensitive_equipment",
+    "summary": "Elevated ozone and environmental exposure conditions for outdoor plants and sensitive equipment."
+  },
+  {
+    "location": "General Outdoor Demo",
+    "castnet_site": "Secondary Demo CASTNET Profile",
+    "pollution_profile": {
+      "ozone_risk": "medium",
+      "deposition_risk": "medium"
+    },
+    "risk_mode": "general_outdoor_protection",
+    "summary": "Moderate outdoor exposure conditions where broad resource protection is useful."
+  }
+]
+
