@@ -273,9 +273,9 @@ Critical in case the live demo has any instability.
 
 ## Demo Failure Fallbacks
 
-### If Boxer fails live
+### If YOLO fails live
 
-Use YOLO fallback without changing the story.
+Use fixture detections from the backup demo image without changing the story.
 
 ### If live camera fails
 

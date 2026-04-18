@@ -111,14 +111,14 @@ Its job is to answer:
 
 ### Detection strategy
 
-Preferred:
-
-* **Boxer**
-
-Fallback:
+Primary:
 
 * **YOLO**
-* plus simple heuristics for approximate spatial reasoning
+* bounding-box and frame-position heuristics for approximate spatial reasoning
+
+Optional stretch:
+
+* **Boxer**, only if it is already stable and does not slow down integration
 
 ### Example output
 
@@ -408,15 +408,13 @@ The frontend displays recommendations and rationale.
 
 ## Detection and Spatial Reasoning Strategy
 
-### Preferred path: Boxer
+### Primary path: YOLO
 
-Boxer is preferred because it better supports the story of scene grounding and approximate spatial understanding.
+YOLO is the primary path because it is faster to integrate, easier to test, and more reliable under hackathon time pressure.
 
-### Fallback path: YOLO
+Use YOLO to detect the small fixed object taxonomy, then add approximate spatial reasoning with:
 
-If Boxer cannot be integrated in time, the system should switch to YOLO and approximate spatial reasoning using:
-
-* bounding box size
+* bounding-box size
 * frame position
 * scene heuristics
 * optional lightweight depth cues if easy
@@ -426,6 +424,10 @@ If Boxer cannot be integrated in time, the system should switch to YOLO and appr
 Aeris does **not** require perfect 3D reconstruction.
 
 It requires enough spatial information to support practical prioritization.
+
+### Optional path: Boxer
+
+Boxer can remain a stretch option if it becomes stable quickly, but it should not block the demo. The system contract should stay the same regardless of whether detections come from YOLO, Boxer, or a fixture.
 
 ---
 
@@ -451,9 +453,9 @@ This is an MVP+ architecture, not a full production system.
 
 Fallback to a preprocessed small environmental profile lookup table derived from CASTNET for the demo location(s).
 
-### If Boxer is unstable
+### If YOLO is unstable
 
-Fallback immediately to YOLO plus heuristic distance/reachability estimation.
+Fallback immediately to pre-captured demo-frame detections while keeping the same recommendation pipeline.
 
 ### If live camera is unstable
 

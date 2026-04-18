@@ -70,7 +70,7 @@ This includes:
 ### 2. Dynamic Context
 Aeris scans the visible scene.
 
-Using **Boxer** as the preferred scene-understanding engine, or **YOLO as fallback**, it detects relevant objects and estimates enough spatial information to support prioritization.
+Using **YOLO** as the primary scene-understanding engine, with optional Boxer exploration only if time allows, it detects relevant objects and estimates enough spatial information to support prioritization.
 
 ### 3. Policy Engine
 Aeris runs a deterministic ranking engine that weighs:
@@ -110,8 +110,9 @@ Aeris is a sustainability project because it focuses on:
 - schema-based orchestration
 
 ### Computer Vision
-- **Boxer** for preferred spatial scene grounding
-- **YOLO fallback** if Boxer integration becomes unstable
+- **YOLO** for primary object detection
+- simple bounding-box heuristics for approximate reachability / distance
+- **Boxer optional** only if it becomes stable without slowing the demo
 
 ### Data
 - CASTNET-derived environmental context

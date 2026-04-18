@@ -73,11 +73,9 @@ At minimum, this profile should include:
 ### 2. Scene Understanding
 The system must analyze a real scene and identify relevant resources.
 
-Preferred:
-- Boxer
-
-Fallback:
 - YOLO
+- simple bounding-box / frame-position heuristics
+- fixture detections as a fallback if live CV is unstable
 
 The output must produce:
 - object names
@@ -274,8 +272,9 @@ It only needs enough signal to support:
 - visibly grounded recommendations
 
 This means:
-- Boxer is ideal
-- YOLO fallback is acceptable
+- YOLO is the primary CV path
+- Boxer is optional only if it becomes stable quickly
+- fixture detections are acceptable as a demo safety path
 - approximate spatial reasoning is enough
 
 ---
@@ -358,8 +357,9 @@ If core functionality works early, spend the remaining time on:
 
 ### Gallo
 - object detection pipeline
-- Boxer integration or YOLO fallback
+- YOLO integration
 - normalized scene output
+- fixture fallback if live detection is unstable
 
 ### Shuja
 - CASTNET simplification
@@ -401,8 +401,8 @@ If core functionality works early, spend the remaining time on:
 
 ## Fallback Rules
 
-### If Boxer is unstable
-Switch to YOLO immediately.
+### If YOLO is unstable
+Use fixture detections from a pre-captured demo frame.
 
 ### If live camera is unstable
 Use uploaded image or pre-captured frame.
