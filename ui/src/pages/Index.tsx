@@ -40,6 +40,7 @@ const Index = () => {
     frameHeight,
     lastFrameId,
     lastTimestamp,
+    visionSource,
   } = useCameraScanner({ enabled: scanning, intervalMs: 700 });
 
   // Try to grab user geolocation once; fall back to default silently.
@@ -162,6 +163,10 @@ const Index = () => {
               label={scanning ? "Scanning" : "Paused"}
               pulse={scanning}
             />
+            <StatusChip
+              tone={visionSource === "browser_yolo" ? "primary" : "muted"}
+              label={formatVisionSource(visionSource)}
+            />
           </div>
         </div>
       </header>
@@ -237,5 +242,11 @@ const Index = () => {
     </div>
   );
 };
+
+function formatVisionSource(source: "browser_yolo" | "backend_yolo" | "loading"): string {
+  if (source === "browser_yolo") return "Browser YOLO";
+  if (source === "backend_yolo") return "Backend YOLO";
+  return "Vision loading";
+}
 
 export default Index;

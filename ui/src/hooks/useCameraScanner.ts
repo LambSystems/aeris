@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { scanFrame } from "@/lib/api";
 import type { DetectedObject, ScanFrameResponse } from "@/lib/types";
+import { createPreferredVisionProvider, type VisionProviderSource } from "@/vision";
+import type { VisionProvider } from "@/vision/types";
 
 const STABILITY_WINDOW_MS = 2200;
 const KEEP_ALIVE_MS = 1400;
@@ -23,6 +24,7 @@ interface UseCameraScannerReturn {
   lastFrameId: string | null;
   lastTimestamp: string | null;
   scanning: boolean;
+  visionSource: VisionProviderSource | "loading";
 }
 
 export function useCameraScanner({
@@ -33,6 +35,7 @@ export function useCameraScanner({
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const inFlightRef = useRef(false);
   const intervalRef = useRef<number | null>(null);
+  const providerRef = useRef<VisionProvider | null>(null);
   const historyRef = useRef<DetectionSample[]>([]);
   const stableObjectsRef = useRef<DetectedObject[]>([]);
   const lastStableAtRef = useRef(0);
@@ -44,6 +47,7 @@ export function useCameraScanner({
   const [frameHeight, setFrameHeight] = useState(0);
   const [lastFrameId, setLastFrameId] = useState<string | null>(null);
   const [lastTimestamp, setLastTimestamp] = useState<string | null>(null);
+  const [visionSource, setVisionSource] = useState<VisionProviderSource | "loading">("loading");
 
   // Start camera once
   useEffect(() => {
@@ -82,6 +86,24 @@ export function useCameraScanner({
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void createPreferredVisionProvider().then((provider) => {
+      if (cancelled) {
+        void provider.dispose?.();
+        return;
+      }
+      providerRef.current = provider;
+      setVisionSource(provider.source);
+    });
+
+    return () => {
+      cancelled = true;
+      void providerRef.current?.dispose?.();
+      providerRef.current = null;
+    };
+  }, []);
+
   const captureFrame = useCallback(async (): Promise<Blob | null> => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) return null;
@@ -115,7 +137,10 @@ export function useCameraScanner({
       try {
         const blob = await captureFrame();
         if (!blob) return;
-        const result: ScanFrameResponse = await scanFrame(blob);
+        const provider = providerRef.current;
+        if (!provider) return;
+        const result: ScanFrameResponse = await provider.detect(blob);
+        setVisionSource(provider.source);
         setObjects(stabilizeDetections(result.objects ?? [], Date.now()));
         setFrameWidth(result.frame_width);
         setFrameHeight(result.frame_height);
@@ -146,6 +171,7 @@ export function useCameraScanner({
     lastFrameId,
     lastTimestamp,
     scanning: enabled && cameraReady,
+    visionSource,
   };
 
   function stabilizeDetections(rawObjects: DetectedObject[], now: number): DetectedObject[] {
