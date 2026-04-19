@@ -1,10 +1,11 @@
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
-from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
+from app.env_loader import load_app_env
+
+load_app_env()
 
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
 from app.context.fixed_context_service import load_fixed_context
@@ -37,6 +38,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
