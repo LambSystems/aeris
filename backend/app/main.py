@@ -10,7 +10,7 @@ load_app_env()
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
 from app.context.fixed_context_service import load_fixed_context
 from app.context.schemas import EnvironmentalFixedContext
-from app.cv.yolo_service import detect_objects, scan_demo_frame
+from app.cv.yolo_service import scan_demo_frame, scan_frame_from_bytes
 from app.data import load_demo_context, load_scene
 from app.fallback_policy import build_fallback_recommendations
 from app.schemas import (
@@ -75,15 +75,19 @@ def get_demo_scene_after_move() -> DynamicContext:
 
 
 @app.post("/scan-frame", response_model=DynamicContext)
-async def scan_frame(file: UploadFile | None = File(default=None)) -> DynamicContext:
+async def scan_frame(
+    file: UploadFile | None = File(default=None),
+    include_raw: bool = False,
+    min_confidence: float = 0.45,
+) -> DynamicContext:
     if file is None:
         return scan_demo_frame()
 
     image_bytes = await file.read()
-    return detect_objects(
+    return scan_frame_from_bytes(
         image_bytes=image_bytes,
-        filename=file.filename,
-        content_type=file.content_type,
+        include_raw=include_raw,
+        confidence_threshold=min_confidence,
     )
 
 

@@ -1,9 +1,13 @@
+import os
+from pathlib import Path
 from typing import Any
 
 from app.data import load_scene
 from app.schemas import BoundingBox, DynamicContext, SceneObject
 
 
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_MODEL_PATH = BACKEND_ROOT / "yolov8n.pt"
 CONF_THRESHOLD = 0.45
 COCO_TO_SUSTAINABILITY: dict[str, str] = {
     "bottle": "plastic_bottle",
@@ -46,7 +50,11 @@ def detect_objects(
     return scan_frame_from_bytes(image_bytes)
 
 
-def scan_frame_from_bytes(image_bytes: bytes) -> DynamicContext:
+def scan_frame_from_bytes(
+    image_bytes: bytes,
+    include_raw: bool = False,
+    confidence_threshold: float = CONF_THRESHOLD,
+) -> DynamicContext:
     """Run YOLO on one uploaded image, falling back safely if CV is unavailable."""
     if not image_bytes:
         return scan_demo_frame()
@@ -64,12 +72,12 @@ def scan_frame_from_bytes(image_bytes: bytes) -> DynamicContext:
         objects: list[SceneObject] = []
         for box in results.boxes:
             conf = float(box.conf[0])
-            if conf < CONF_THRESHOLD:
+            if conf < confidence_threshold:
                 continue
 
             coco_name = model.names[int(box.cls[0])]
             obj_name = COCO_TO_SUSTAINABILITY.get(coco_name, coco_name)
-            if obj_name not in ADVICE_CLASSES:
+            if not include_raw and obj_name not in ADVICE_CLASSES:
                 continue
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             objects.append(
@@ -89,7 +97,7 @@ def scan_frame_from_bytes(image_bytes: bytes) -> DynamicContext:
 
         return DynamicContext(
             objects=objects,
-            source="yolo_live",
+            source="yolo_live_raw" if include_raw else "yolo_live",
             frame_width=w,
             frame_height=h,
         )
@@ -114,5 +122,6 @@ def _get_model() -> Any:
     if _model is None:
         from ultralytics import YOLO
 
-        _model = YOLO("yolo11s.pt")
+        model_path = os.environ.get("AERIS_YOLO_MODEL") or str(DEFAULT_MODEL_PATH)
+        _model = YOLO(model_path)
     return _model
