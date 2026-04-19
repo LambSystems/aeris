@@ -1,0 +1,9 @@
+# Copy this file to can_bottle.data.yaml and update the path if you store the
+# dataset elsewhere.
+path: ../datasets/can_bottle
+train: images/train
+val: images/val
+
+names:
+  0: can
+  1: bottle

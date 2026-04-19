@@ -95,6 +95,8 @@ Shape:
 ```json
 {
   "source": "yolo",
+  "image_width": 640,
+  "image_height": 360,
   "objects": [
     {
       "name": "seed_tray",
@@ -176,6 +178,7 @@ Allowed `decision_source` values:
 From backend:
 
 - `GET /context/demo` -> `FixedContext`
+- `GET /scan-frame/config` -> YOLO adapter config and labels
 - `POST /scan-frame` -> `DynamicContext`
 - `POST /analyze-scene` -> `AnalysisJobResponse`
 - `GET /analysis/{job_id}` -> `AnalysisJobResponse`
@@ -192,7 +195,14 @@ To backend:
 
 For backend YOLO:
 
-- sampled camera frame to `/scan-frame` once implemented with image upload
+- sampled camera frame to `/scan-frame` as multipart form data:
+
+```text
+frame: JPEG, PNG, or WebP blob
+image_width: original sampled frame width
+image_height: original sampled frame height
+confidence_threshold: optional 0-1 override
+```
 
 For fixture or browser-side detection:
 
@@ -266,16 +276,25 @@ Required object fields:
 
 ```json
 {
-  "name": "seed_tray",
-  "confidence": 0.94,
-  "distance": 1.0,
-  "reachable": true,
-  "bbox": {
-    "x": 92,
-    "y": 112,
-    "width": 190,
-    "height": 126
-  }
+  "source": "yolo",
+  "image_width": 640,
+  "image_height": 360,
+  "inference_ms": 72.4,
+  "model_name": "yolov8n.pt",
+  "objects": [
+    {
+      "name": "seed_tray",
+      "confidence": 0.94,
+      "distance": 1.0,
+      "reachable": true,
+      "bbox": {
+        "x": 92,
+        "y": 112,
+        "width": 190,
+        "height": 126
+      }
+    }
+  ]
 }
 ```
 
@@ -297,6 +316,7 @@ unknown                             -> misc_item
 ### Must Do
 
 - return boxes in the same coordinate space as the sampled frame
+- include `image_width` and `image_height` for frontend scaling
 - include confidence scores
 - keep output schema stable
 - keep fixture output available
@@ -353,6 +373,7 @@ To frontend:
 ```text
 GET  /health
 GET  /context/demo
+GET  /scan-frame/config
 POST /scan-frame
 POST /analyze-scene
 GET  /analysis/{job_id}

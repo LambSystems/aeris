@@ -37,6 +37,15 @@ class SceneObject(BaseModel):
     distance: float = Field(ge=0)
     reachable: bool = True
     bbox: BoundingBox | None = None
+    raw_label: str | None = None
+    category: str | None = None
+
+
+class RawDetection(BaseModel):
+    label: str
+    confidence: float = Field(ge=0, le=1)
+    normalized_name: str | None = None
+    bbox: BoundingBox | None = None
 
 
 class DynamicContext(BaseModel):
@@ -44,6 +53,13 @@ class DynamicContext(BaseModel):
 
     objects: list[SceneObject]
     source: str = "fixture"
+    image_width: int | None = Field(default=None, gt=0)
+    image_height: int | None = Field(default=None, gt=0)
+    inference_ms: float | None = Field(default=None, ge=0)
+    model_name: str | None = None
+    scene_type: str | None = None
+    scene_tags: list[str] = []
+    raw_detections: list[RawDetection] = []
 
 
 class RecommendationRequest(BaseModel):
@@ -113,3 +129,14 @@ class DemoRunResponse(BaseModel):
 class HealthResponse(BaseModel):
     ok: bool
     service: str
+
+
+class YoloConfigResponse(BaseModel):
+    accepted_content_types: list[str]
+    max_frame_bytes: int
+    default_confidence_threshold: float
+    default_image_size: int
+    model_name: str
+    include_all_classes: bool
+    aeris_labels: list[str]
+    label_aliases: dict[str, str]

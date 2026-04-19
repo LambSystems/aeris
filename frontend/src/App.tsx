@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Camera, Database, RefreshCcw, ShieldCheck, Sparkles } from "lucide-react";
-import { analyzeScene, getAnalysisJob, runDemo } from "./api";
+import { analyzeScene, getAnalysisJob, runDemo, scanFrame } from "./api";
 import type { ActionRecommendation, DemoRunResponse, SceneObject } from "./types/aeris";
 
 const actionLabels: Record<ActionRecommendation["action"], string> = {
@@ -30,6 +30,27 @@ function App() {
     setScene(nextScene);
     setStatus("complete");
     void startAgentAnalysis(response);
+  }
+
+  async function scanCurrentScene() {
+    setStatus("scanning");
+    setAnalysisStatus("idle");
+    try {
+      const base = demo ?? (await runDemo("demo"));
+      const dynamicContext = await scanFrame();
+      const response = {
+        ...base,
+        dynamic_context: dynamicContext,
+      };
+
+      setDemo(response);
+      setScene("demo");
+      setStatus("complete");
+      void startAgentAnalysis(response);
+    } catch (error) {
+      console.warn("Live scan failed. Falling back to demo frame.", error);
+      await loadDemo("demo");
+    }
   }
 
   async function startAgentAnalysis(response: DemoRunResponse) {
@@ -99,10 +120,15 @@ function App() {
             <span className="source-pill">{sourceLabel}</span>
           </div>
 
-          <SceneCanvas objects={detectedObjects} topTarget={topAction?.target} />
+          <SceneCanvas
+            objects={detectedObjects}
+            topTarget={topAction?.target}
+            imageWidth={demo?.dynamic_context.image_width ?? 920}
+            imageHeight={demo?.dynamic_context.image_height ?? 460}
+          />
 
           <div className="control-row">
-            <button onClick={() => loadDemo("demo")}>
+            <button onClick={() => scanCurrentScene()}>
               <Camera size={18} />
               Scan Scene
             </button>
@@ -132,7 +158,17 @@ function App() {
   );
 }
 
-function SceneCanvas({ objects, topTarget }: { objects: SceneObject[]; topTarget?: string }) {
+function SceneCanvas({
+  objects,
+  topTarget,
+  imageWidth,
+  imageHeight,
+}: {
+  objects: SceneObject[];
+  topTarget?: string;
+  imageWidth: number;
+  imageHeight: number;
+}) {
   const labels = useMemo(() => objects.filter((object) => object.bbox), [objects]);
 
   return (
@@ -145,10 +181,10 @@ function SceneCanvas({ objects, topTarget }: { objects: SceneObject[]; topTarget
           className={`bbox ${object.name === topTarget ? "priority" : ""}`}
           key={object.name}
           style={{
-            left: `${(object.bbox!.x / 920) * 100}%`,
-            top: `${(object.bbox!.y / 460) * 100}%`,
-            width: `${(object.bbox!.width / 920) * 100}%`,
-            height: `${(object.bbox!.height / 460) * 100}%`,
+            left: `${(object.bbox!.x / imageWidth) * 100}%`,
+            top: `${(object.bbox!.y / imageHeight) * 100}%`,
+            width: `${(object.bbox!.width / imageWidth) * 100}%`,
+            height: `${(object.bbox!.height / imageHeight) * 100}%`,
           }}
         >
           <span>
@@ -205,7 +241,7 @@ function ActionsPanel({ actions }: { actions: ActionRecommendation[] }) {
                 {actionLabels[action.action]}: {formatName(action.target)}
               </strong>
               <p>{action.reason}</p>
-              <span className="score">Score {action.score.toFixed(2)}</span>
+              {action.score !== null && <span className="score">Score {action.score.toFixed(2)}</span>}
             </div>
           </article>
         ))}

@@ -1,5 +1,7 @@
 {
   "source": "fixture_after_move",
+  "image_width": 920,
+  "image_height": 460,
   "objects": [
     {
       "name": "seed_tray",

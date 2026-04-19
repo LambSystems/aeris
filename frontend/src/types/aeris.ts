@@ -28,18 +28,34 @@ export interface SceneObject {
   distance: number;
   reachable: boolean;
   bbox?: BoundingBox | null;
+  raw_label?: string | null;
+  category?: string | null;
+}
+
+export interface RawDetection {
+  label: string;
+  confidence: number;
+  normalized_name?: string | null;
+  bbox?: BoundingBox | null;
 }
 
 export interface DynamicContext {
   objects: SceneObject[];
   source: string;
+  image_width?: number | null;
+  image_height?: number | null;
+  inference_ms?: number | null;
+  model_name?: string | null;
+  scene_type?: string | null;
+  scene_tags?: string[];
+  raw_detections?: RawDetection[];
 }
 
 export interface ActionRecommendation {
   rank: number;
   action: ActionType;
   target: string;
-  score: number;
+  score: number | null;
   reason_tags: string[];
   reason: string;
 }
@@ -67,6 +83,17 @@ export interface AnalysisJobResponse {
 export interface LatestAnalysisResponse {
   has_result: boolean;
   job?: AnalysisJobResponse | null;
+}
+
+export interface YoloConfigResponse {
+  accepted_content_types: string[];
+  max_frame_bytes: number;
+  default_confidence_threshold: number;
+  default_image_size: number;
+  model_name: string;
+  include_all_classes: boolean;
+  aeris_labels: string[];
+  label_aliases: Record<string, string>;
 }
 
 export interface ExplanationRequest {

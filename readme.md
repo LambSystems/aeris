@@ -234,6 +234,7 @@ The frontend falls back to mock data if the backend is not running.
 ## Build Priorities
 
 See [docs/team-contracts.md](docs/team-contracts.md) for exact inputs and outputs between team members.
+See [docs/yolo-integration.md](docs/yolo-integration.md) for the live YOLO upload and output contract.
 
 ### Piero / Backend
 

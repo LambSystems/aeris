@@ -13,6 +13,10 @@ export const mockDemoResponse: DemoRunResponse = {
   },
   dynamic_context: {
     source: "frontend_mock",
+    image_width: 920,
+    image_height: 460,
+    inference_ms: 0,
+    model_name: "frontend_mock",
     objects: [
       {
         name: "seed_tray",

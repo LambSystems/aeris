@@ -5,9 +5,18 @@ import type {
   DemoRunResponse,
   DynamicContext,
   LatestAnalysisResponse,
+  YoloConfigResponse,
 } from "./types/aeris";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+interface ScanFrameOptions {
+  frame?: Blob;
+  imageWidth?: number;
+  imageHeight?: number;
+  confidenceThreshold?: number;
+  imageSize?: number;
+}
 
 export async function runDemo(scene: "demo" | "after_move" = "demo"): Promise<DemoRunResponse> {
   try {
@@ -44,9 +53,28 @@ export async function runDemo(scene: "demo" | "after_move" = "demo"): Promise<De
   }
 }
 
-export async function scanFrame(): Promise<DynamicContext> {
+export async function scanFrame(options: ScanFrameOptions = {}): Promise<DynamicContext> {
+  const body = new FormData();
+
+  if (options.frame) {
+    body.append("frame", options.frame);
+  }
+  if (options.imageWidth) {
+    body.append("image_width", String(options.imageWidth));
+  }
+  if (options.imageHeight) {
+    body.append("image_height", String(options.imageHeight));
+  }
+  if (options.confidenceThreshold !== undefined) {
+    body.append("confidence_threshold", String(options.confidenceThreshold));
+  }
+  if (options.imageSize !== undefined) {
+    body.append("image_size", String(options.imageSize));
+  }
+
   const response = await fetch(`${API_BASE_URL}/scan-frame`, {
     method: "POST",
+    body: options.frame ? body : undefined,
   });
 
   if (!response.ok) {
@@ -54,6 +82,16 @@ export async function scanFrame(): Promise<DynamicContext> {
   }
 
   return (await response.json()) as DynamicContext;
+}
+
+export async function getYoloConfig(): Promise<YoloConfigResponse> {
+  const response = await fetch(`${API_BASE_URL}/scan-frame/config`);
+
+  if (!response.ok) {
+    throw new Error(`Aeris YOLO config API returned ${response.status}`);
+  }
+
+  return (await response.json()) as YoloConfigResponse;
 }
 
 export async function analyzeScene(request: AnalyzeSceneRequest): Promise<AnalysisJobResponse> {

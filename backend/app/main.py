@@ -1,10 +1,18 @@
+from pathlib import Path
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
-from app.cv.yolo_service import scan_demo_frame
+from app.cv.yolo_service import (
+    ALLOWED_CONTENT_TYPES,
+    MAX_FRAME_BYTES,
+    scan_demo_frame,
+    scan_frame_bytes,
+    yolo_config,
+)
 from app.data import load_demo_context, load_scene
 from app.fallback_policy import build_fallback_recommendations
 from app.schemas import (
@@ -18,8 +26,11 @@ from app.schemas import (
     LatestAnalysisResponse,
     RecommendationOutput,
     RecommendationRequest,
+    YoloConfigResponse,
 )
 
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(
     title="Aeris API",
@@ -59,9 +70,40 @@ def get_demo_scene_after_move() -> DynamicContext:
     return load_scene("after_move")
 
 
+@app.get("/scan-frame/config", response_model=YoloConfigResponse)
+def scan_frame_config() -> YoloConfigResponse:
+    return YoloConfigResponse.model_validate(yolo_config())
+
+
 @app.post("/scan-frame", response_model=DynamicContext)
-def scan_frame() -> DynamicContext:
-    return scan_demo_frame()
+async def scan_frame(
+    frame: UploadFile | None = File(default=None),
+    image_width: int | None = Form(default=None),
+    image_height: int | None = Form(default=None),
+    confidence_threshold: float | None = Form(default=None),
+    image_size: int | None = Form(default=None),
+) -> DynamicContext:
+    if frame is None:
+        return scan_demo_frame()
+
+    if frame.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Frame must be a JPEG, PNG, or WebP image.")
+    if confidence_threshold is not None and not 0 <= confidence_threshold <= 1:
+        raise HTTPException(status_code=422, detail="confidence_threshold must be between 0 and 1.")
+    if image_size is not None and not 320 <= image_size <= 1600:
+        raise HTTPException(status_code=422, detail="image_size must be between 320 and 1600.")
+
+    image_bytes = await frame.read()
+    if len(image_bytes) > MAX_FRAME_BYTES:
+        raise HTTPException(status_code=413, detail="Frame is too large. Send a compressed sampled frame.")
+
+    return scan_frame_bytes(
+        image_bytes,
+        image_width=image_width,
+        image_height=image_height,
+        confidence_threshold=confidence_threshold,
+        image_size=image_size,
+    )
 
 
 @app.post("/analyze-scene", response_model=AnalysisJobResponse)
