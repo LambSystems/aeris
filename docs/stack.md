@@ -1,343 +1,265 @@
 # Stack
 
-## Purpose
+## Current Chosen Stack
 
-This document defines the fastest stack for shipping Aeris with live 2D perception and asynchronous agentic decisions.
+The stack is optimized for shipping a stable hackathon demo quickly:
 
-The goal is:
-
-- phone-style live camera experience
-- YOLO object detection in 2D
-- CASTNET environmental context
-- Gemini-first agentic reasoning
-- OpenAI fallback
-- fixture/template fallback for demo safety
-
-The UI should not wait for the LLM. It should keep showing the camera stream and latest detection state while the backend runs reasoning jobs in the background.
-
----
-
-## Recommended Stack
-
-### Frontend
-
-Use:
-
-- **Lovable** for first UI generation
-- **Vite**
-- **React**
-- **TypeScript**
-- **Tailwind CSS**
-
-Why:
-
-- fast phone-app-style interface
-- easy camera stream / image fallback
-- easy 2D overlay rendering
-- compatible with Lovable output
-- simple API polling for analysis jobs
-
-Frontend responsibility:
-
-- keep livestream smooth
-- render detection boxes
-- call analysis asynchronously
-- poll latest recommendation
-- never block the camera on reasoning
-
-Avoid:
-
-- landing page output from Lovable
-- chat-first UI
-- heavy navigation
-- blocking UI state while LLM runs
-
----
-
-### Backend
-
-Use:
-
-- **Python**
-- **FastAPI**
-- **Pydantic**
-- **Uvicorn**
-
-Why:
-
-- native fit for YOLO/OpenCV/image processing
-- clean schema contracts
-- simple background task support
-- easy provider wrappers for Gemini/OpenAI
-- easy fixture fallback
-
-Backend responsibility:
-
-- load CASTNET fixed context
-- normalize scene snapshots
-- expose scan/analyze/latest APIs
-- run async agentic reasoning jobs
-- store latest completed recommendation in memory for the demo
-
-Avoid:
-
-- database setup
-- auth
-- queues unless absolutely needed
-- calling LLMs on every video frame
-
----
-
-### Computer Vision
-
-Primary:
-
-- **YOLO**
-- 2D bounding boxes
-- label normalization
-- confidence filtering
-- simple distance/reachability heuristics
-
-Fallback:
-
-- fixture-based normalized detections
-
-Optional stretch:
-
-- Boxer, only if it becomes stable without slowing the demo
-
-YOLO should produce a normalized `DynamicContext` shape:
-
-```json
-{
-  "source": "yolo",
-  "objects": [
-    {
-      "name": "seed_tray",
-      "confidence": 0.94,
-      "distance": 1.0,
-      "reachable": true,
-      "bbox": {
-        "x": 92,
-        "y": 112,
-        "width": 190,
-        "height": 126
-      }
-    }
-  ]
-}
+```text
+Frontend: React + Vite + TypeScript + Tailwind + shadcn-style components
+UI seed:  Lovable-generated project in /ui, then manually integrated
+Vision:   Streamlit WebRTC + Ultralytics YOLO .pt
+Backend:  Python + FastAPI + Pydantic
+Data:     CASTNET processed data + Open-Meteo + weather.gov alerts
+Advice:   Gemini first, Anthropic second, deterministic fallback, in-memory cache
+Runtime:  Local demo, three processes
 ```
 
 ---
 
-### Agentic Decision Layer
+## Why Not Only React For Vision
 
-Primary:
+React is still the product UI. But the stable vision demo uses Streamlit because:
 
-- **Gemini**
+- Gallo's model is a YOLO `.pt` model, not a browser-ready model.
+- PyTorch CUDA can use the local NVIDIA GPU.
+- Streamlit WebRTC can draw boxes smoothly without HTTP frame roundtrips.
+- Browser ONNX was tested and felt sticky on this machine.
 
-Secondary:
+The React app embeds Streamlit and handles everything around it:
 
-- **OpenAI**
+- header/status
+- environmental context
+- current scan
+- recommendation
+- risk signals
 
-Fallback:
+---
 
-- local template/fallback policy
+## Frontend Stack
 
-The LLM should reason over structured data only:
+Use:
 
-- CASTNET context
-- detected objects
-- allowed actions
-- strict output schema
+- `ui/`
+- Vite
+- React
+- TypeScript
+- Tailwind
+- shadcn-style primitives
+- `lucide-react`
 
-It should not process raw video.
+Important files:
 
-The agent decides:
+```text
+ui/src/pages/Index.tsx
+ui/src/components/aeris/DecisionPanel.tsx
+ui/src/components/aeris/RecommendationCard.tsx
+ui/src/lib/api.ts
+ui/src/lib/types.ts
+ui/src/index.css
+```
 
-- ranking
-- action type
-- target
-- reason
-- explanation
+Current mode:
 
-The fallback policy exists only for safety.
+```env
+VITE_VISION_PROVIDER=streamlit-embed
+VITE_STREAMLIT_URL=http://localhost:8501?embed=true
+VITE_AERIS_API_BASE=http://localhost:8000
+```
+
+Frontend must not:
+
+- call Gemini/Anthropic/OpenAI directly
+- own API keys
+- send every camera frame in the current demo path
+- block the UI while advice is loading
+
+---
+
+## Vision Stack
+
+Use:
+
+- Python
+- Streamlit
+- `streamlit-webrtc`
+- Ultralytics YOLO
+- PyTorch CUDA
+- OpenCV drawing helpers
+
+Primary model:
+
+```text
+backend/models/trash-quick-v4-best.pt
+```
+
+Expected demo classes:
+
+```text
+aluminum_can
+paper
+plastic_bottle
+```
+
+Config knobs:
+
+```powershell
+$env:YOLO_DEVICE="0"
+$env:YOLO_IMGSZ="320"
+$env:YOLO_FRAME_SKIP="1"
+$env:AERIS_CAMERA_WIDTH="960"
+$env:AERIS_CAMERA_HEIGHT="540"
+```
+
+Performance presets:
+
+```text
+Quality: 960x540, frame_skip 1, imgsz 320
+Smooth:  640x360, frame_skip 2, imgsz 320
+```
+
+---
+
+## Backend Stack
+
+Use:
+
+- Python
+- FastAPI
+- Pydantic
+- Uvicorn
+- `python-multipart`
+- public HTTP APIs for weather context
+
+Important files:
+
+```text
+backend/app/main.py
+backend/app/vision_state.py
+backend/app/context/fixed_context_service.py
+backend/app/sustainability/adviser.py
+backend/app/sustainability/fallback_advice.py
+backend/app/cv/yolo_service.py
+backend/streamlit_app.py
+```
+
+Backend owns:
+
+- context loading
+- schema stability
+- advice provider order
+- advice fallback
+- latest detection bridge
+- API docs
+
+---
+
+## LLM Stack
+
+Provider priority:
+
+1. Gemini
+2. Anthropic
+3. deterministic fallback
+
+Root `.env`:
+
+```env
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+```
+
+The LLM receives structured data:
+
+- object class
+- confidence
+- fixed environmental context
+- CASTNET reading
+
+The LLM does not receive raw video.
+
+Advice is cached by:
+
+- object class
+- CASTNET site
+- CASTNET measurement date
+- active risk flags
+
+---
+
+## Data Stack
+
+Use:
+
+- processed CASTNET files in `data/castnet`
+- nearest-site selection
+- Open-Meteo weather
+- Open-Meteo air quality
+- weather.gov alerts
+
+The product claim is not "we have a dataset in the repo."
+
+The claim is:
+
+```text
+Dataset/live environmental context changes the recommendation.
+```
 
 ---
 
 ## API Contract
 
-See `docs/team-contracts.md` for owner-by-owner inputs and outputs.
-
-### Core Endpoints
+Primary live-demo endpoints:
 
 ```text
 GET  /health
-GET  /context/demo
+GET  /context/fixed
+GET  /vision/latest-detection
+POST /sustainability/detect
+```
+
+Useful fallback/testing endpoints:
+
+```text
 POST /scan-frame
+GET  /context/demo
+GET  /scene/demo
+POST /demo/run
+POST /recommend
 POST /analyze-scene
 GET  /analysis/latest
 GET  /analysis/{job_id}
 ```
 
-### Compatibility / Demo Endpoints
+The async analysis endpoints remain in the repo, but they are not the current primary demo path.
+
+---
+
+## Browser YOLO Status
+
+Browser YOLO is documented in:
 
 ```text
-GET  /scene/demo
-GET  /scene/demo-after-move
-POST /demo/run
-POST /recommend
+docs/yolo-browser.md
 ```
 
-The compatibility endpoints are useful for testing and fallback demos, but the primary live architecture should use `scan-frame`, `analyze-scene`, and `analysis/latest`.
+Status:
 
----
-
-## Endpoint Responsibilities
-
-### `POST /scan-frame`
-
-Fast perception path.
-
-Returns latest YOLO detections or fixture detections. This endpoint must be fast.
-
-### `POST /analyze-scene`
-
-Async agentic decision path.
-
-Accepts the latest scene snapshot and starts a reasoning job. Returns immediately with:
-
-```json
-{
-  "job_id": "string",
-  "status": "pending"
-}
-```
-
-### `GET /analysis/{job_id}`
-
-Returns job status:
-
-```text
-pending | complete | failed
-```
-
-If complete, includes recommendations.
-
-### `GET /analysis/latest`
-
-Returns the latest completed recommendation, if any.
-
-The UI should keep rendering the live scene while polling this endpoint.
-
----
-
-## Runtime Cadence
-
-Do not call the agent for every frame.
-
-Recommended cadence:
-
-- camera stream: native browser/mobile frame rate
-- YOLO snapshot: every 1-2 seconds or on user-triggered scan
-- agent analysis: on user tap, meaningful object-set change, or stable scene
-- latest recommendation polling: every 1 second while a job is pending
-
----
-
-## Repo Structure
-
-```text
-aeris/
-  frontend/
-  backend/
-    app/
-      main.py
-      schemas.py
-      data.py
-      analysis_store.py
-      agent_decision.py
-      fallback_policy.py
-      cv/
-        yolo_service.py
-      llm/
-        provider.py
-        gemini.py
-        openai_provider.py
-        template.py
-  data/
-    castnet/
-      processed/
-    sample_inputs/
-  docs/
-```
-
----
-
-## Package Choices
-
-### Frontend
-
-- `vite`
-- `react`
-- `typescript`
-- `tailwindcss`
-- `lucide-react`
-
-Optional:
-
-- `@react-three/fiber` and `three` only after the 2D live flow works
-
-### Backend
-
-- `fastapi`
-- `uvicorn`
-- `pydantic`
-- `python-dotenv`
-- `python-multipart`
-
-Optional:
-
-- Gemini SDK
-- `openai`
-- `opencv-python`
-- `ultralytics`
-- `pillow`
-
----
-
-## Fallback Strategy
-
-### If YOLO fails
-
-Use fixture detections.
-
-### If Gemini is slow
-
-Keep latest completed recommendation visible and show pending state.
-
-### If Gemini fails
-
-Try OpenAI.
-
-### If all LLM providers fail
-
-Use local fallback policy/template output.
-
-### If the frontend is not integrated yet
-
-Use `/demo/run` for a single-call stable demo.
+- ONNX export works.
+- ONNX Runtime Web loads but was slow/sticky.
+- It may improve with WebGPU or a smaller/custom browser model.
+- Do not make it the main path unless tested live on the demo machine.
 
 ---
 
 ## Final Stack Summary
 
 ```text
-Frontend: React + Vite + TypeScript + Tailwind, generated first with Lovable
-Backend:  Python + FastAPI + Pydantic
-CV:       YOLO primary, fixture fallback, Boxer optional stretch
-Data:     Static CASTNET-derived JSON profiles
-Agent:    Gemini primary, OpenAI fallback, template/fallback policy safety net
-Runtime:  Live camera stays smooth; analysis runs asynchronously
-Deploy:   Local demo first
+React UI for product polish
+Streamlit YOLO for live GPU vision
+FastAPI for context/advice
+CASTNET + weather APIs for environmental evidence
+Gemini/Anthropic/fallback for advice
+Local JSON bridge for hackathon-safe integration
 ```

@@ -1,532 +1,352 @@
 # Team Contracts
 
-## Purpose
+This document tells each person what they own, what they receive, and what they output.
 
-This document is the handoff contract for the team.
-
-Each person should know:
-
-- what they own
-- what they receive as input
-- what they must output
-- which file or endpoint the next person depends on
-
-The goal is to prevent integration confusion during the final hackathon sprint.
-
----
-
-## System Contract Summary
+Current demo source of truth:
 
 ```text
-Frontend camera/demo frame
-        |
-        v
-sampled frame or fixture request
-        |
-        v
-CV / YOLO adapter
-        |
-        v
-DynamicContext
-        |
-        v
-Backend async analysis job
-        |
-        v
-Agentic decision layer
-        |
-        v
-RecommendationOutput
-        |
-        v
-Frontend advice card
+/ui React shell + /backend Streamlit YOLO iframe + FastAPI advice/context
 ```
-
-The camera stream should stay local and smooth. The backend returns detections and advice state whenever those are ready.
 
 ---
 
-## Shared Schemas
+## Shared Runtime Contract
 
-These schema names are the integration boundary. Do not rename fields casually.
+Run three processes:
 
-### `FixedContext`
-
-Producer:
-
-- Shuja / Data
-- Piero / Backend
-
-Consumer:
-
-- Agentic decision layer
-- Frontend context panel
-
-Shape:
-
-```json
-{
-  "location": "Outdoor Garden Demo",
-  "castnet_site": "Demo CASTNET Profile",
-  "pollution_profile": {
-    "ozone_risk": "high",
-    "deposition_risk": "medium"
-  },
-  "risk_mode": "protect_plants_and_sensitive_equipment",
-  "summary": "Elevated ozone and environmental exposure conditions for outdoor plants and sensitive equipment."
-}
+```text
+FastAPI:   http://localhost:8000
+Streamlit: http://localhost:8501
+React:     http://localhost:5173
 ```
 
-### `DynamicContext`
+React uses:
 
-Producer:
-
-- Gallo / CV
-- fixture fallback
-
-Consumer:
-
-- Piero / Backend
-- Shuja / Agent prompt/schema
-- Chau / Frontend overlays
-
-Shape:
-
-```json
-{
-  "source": "yolo",
-  "frame_width": 960,
-  "frame_height": 540,
-  "objects": [
-    {
-      "name": "seed_tray",
-      "confidence": 0.94,
-      "distance": 1.0,
-      "reachable": true,
-      "bbox": {
-        "x": 92,
-        "y": 112,
-        "width": 190,
-        "height": 126
-      }
-    }
-  ]
-}
+```env
+VITE_AERIS_API_BASE=http://localhost:8000
+VITE_VISION_PROVIDER=streamlit-embed
+VITE_STREAMLIT_URL=http://localhost:8501?embed=true
 ```
-
-### `RecommendationOutput`
-
-Producer:
-
-- Gemini agent
-- OpenAI fallback
-- local fallback policy
-
-Consumer:
-
-- Frontend advice card
-- demo script
-
-Shape:
-
-```json
-{
-  "decision_source": "agentic_gemini",
-  "actions": [
-    {
-      "rank": 1,
-      "action": "protect_first",
-      "target": "seed_tray",
-      "score": null,
-      "reason_tags": ["plant_sensitive", "high_ozone_context"],
-      "reason": "Plant-sensitive resource under elevated ozone exposure."
-    }
-  ],
-  "explanation": "Aeris recommends protecting the seed tray first because CASTNET-derived context indicates elevated plant-sensitive exposure.",
-  "missing_insights": []
-}
-```
-
-Allowed `action` values:
-
-- `protect_first`
-- `move_to_storage`
-- `cover_if_time_allows`
-- `low_priority`
-
-Allowed `decision_source` values:
-
-- `agentic_gemini`
-- `agentic_openai`
-- `fallback_policy`
 
 ---
 
-## Chau / Frontend Contract
+## Piero - Backend / Integration
 
 ### Owns
 
-- React/Lovable UI
-- camera or demo frame display
-- box overlay rendering
-- user controls
-- polling analysis jobs
-- advice card rendering
+- FastAPI app
+- fixed environmental context
+- sustainability advice endpoint
+- LLM/fallback/cache behavior
+- Streamlit-to-FastAPI detection bridge
+- run commands and integration stability
 
 ### Inputs
 
-From backend:
+From Streamlit:
 
-- `GET /context/demo` -> `FixedContext`
-- `POST /scan-frame` -> `DynamicContext`
-- `POST /analyze-scene` -> `AnalysisJobResponse`
-- `GET /analysis/{job_id}` -> `AnalysisJobResponse`
-- `GET /analysis/latest` -> latest completed recommendation
+```json
+{
+  "object_class": "aluminum_can",
+  "confidence": 0.84,
+  "bbox": null,
+  "frame_id": "frame_00123",
+  "timestamp": "2026-04-19T06:30:00Z"
+}
+```
 
-Optional fallback:
+From React:
 
-- `GET /scene/demo`
-- `POST /demo/run`
+- GPS coordinates for `/context/fixed`
+- latest detection forwarded to `/sustainability/detect`
+
+From Shuja/data:
+
+- sustainability framing
+- CASTNET interpretation
+- judge narrative constraints
 
 ### Outputs
 
-To backend:
+To React:
 
-For backend YOLO:
+```text
+GET  /context/fixed
+GET  /vision/latest-detection
+POST /sustainability/detect
+```
 
-- sampled camera frame to `/scan-frame` as multipart form field `file`
+### Must Keep Stable
 
-For fixture or browser-side detection:
-
-- `DynamicContext` JSON to `/analyze-scene`
-
-For MVP, if image upload is not ready, omit `file` on `/scan-frame` to get fixture detections, then send that `DynamicContext`.
-
-### Must Do
-
-- keep camera/video display smooth
-- never block video on YOLO or LLM
-- draw boxes from `bbox`
-- show object labels and confidence
-- show CASTNET context
-- show agent status
-- keep latest advice visible while a new job is pending
-- poll analysis jobs until complete or failed
-- keep demo-frame fallback working
+```text
+GET /context/fixed?latitude=...&longitude=...
+GET /vision/latest-detection
+POST /sustainability/detect
+```
 
 ### Must Not Do
 
-- call Gemini/OpenAI directly from the browser
-- expose API keys
-- send every camera frame
-- start a new detection request while the previous one is pending
-- rename backend fields without telling Piero
-- build a landing page instead of the demo screen
-
-### Frontend State Checklist
-
-```text
-cameraStatus: idle | starting | live | fallback
-detectionStatus: idle | detecting | detected | stale | failed
-analysisStatus: idle | pending | complete | failed
-environmentMode: indoor | outdoor
-objects: SceneObject[]
-latestAdvice: RecommendationOutput | null
-```
+- call LLMs every frame
+- break deterministic fallback
+- expose API keys to frontend
+- change response field names without telling Chau
 
 ---
 
-## Gallo / CV Contract
+## Gallo - Computer Vision
 
 ### Owns
 
-- YOLO model path
-- label normalization
-- confidence filtering
-- bounding box output
-- fixture fallback if live YOLO is unstable
+- YOLO weights
+- class quality
+- confidence behavior
+- model handoff to `backend/models`
+
+### Current Model
+
+```text
+backend/models/trash-quick-v4-best.pt
+```
+
+Model files are gitignored:
+
+```text
+backend/models/*.pt
+backend/models/*.onnx
+```
+
+### Expected Demo Classes
+
+```text
+aluminum_can
+paper
+plastic_bottle
+```
 
 ### Inputs
 
-From frontend/backend:
+- webcam frames through Streamlit WebRTC
+- environment variables:
 
-- sampled image frame
-- image width
-- image height
-
-From data/team:
-
-- object taxonomy
+```powershell
+$env:YOLO_MODEL_PATH="C:\Users\akuma\repos\aeris\backend\models\trash-quick-v4-best.pt"
+$env:YOLO_DEVICE="0"
+$env:YOLO_IMGSZ="320"
+$env:YOLO_FRAME_SKIP="1"
+```
 
 ### Outputs
 
-To backend/frontend:
+Streamlit draws boxes directly.
 
-- `DynamicContext`
-- implementation hook: `backend/app/cv/yolo_service.py::detect_objects(image_bytes, filename, content_type)`
-
-Required object fields:
+For backend/React bridge, actionable detections are normalized as:
 
 ```json
 {
-  "name": "seed_tray",
-  "confidence": 0.94,
-  "distance": 1.0,
-  "reachable": true,
-  "bbox": {
-    "x": 92,
-    "y": 112,
-    "width": 190,
-    "height": 126
-  }
+  "object_class": "plastic_bottle",
+  "confidence": 0.87,
+  "bbox": null,
+  "frame_id": "frame_00123",
+  "timestamp": "2026-04-19T06:30:00Z"
 }
-```
-
-### Label Normalization
-
-Map detector labels to Aeris labels:
-
-```text
-potted plant / plant / seedling tray -> seed_tray or plant_pot
-battery / power bank                -> battery_pack
-tool / wrench / shovel              -> metal_tool
-tarp / cloth / cover                -> tarp
-box / bin                           -> storage_bin
-bottle / jug                        -> water_jug
-glove                               -> gloves
-unknown                             -> misc_item
 ```
 
 ### Must Do
 
-- return boxes in the same coordinate space as the sampled frame
-- return `frame_width` and `frame_height` when available
-- include confidence scores
-- keep output schema stable
-- keep fixture output available
+- keep labels stable enough for mapping
+- keep confidence threshold meaningful
+- prioritize can, paper, bottle
+- tell Piero if model class names change
 
 ### Must Not Do
 
 - call LLMs
 - decide sustainability advice
-- block frontend work if live YOLO is not ready
+- overwrite UI/backend files during final integration without coordinating
 
 ---
 
-## Piero / Backend Contract
+## Chau - Frontend
 
 ### Owns
 
-- FastAPI app
-- schema definitions
-- context loading
-- scan-frame contract
-- async analysis jobs
-- latest recommendation state
-- provider wrappers
-- fallback policy
+- React UI in `/ui`
+- visual polish
+- sidebar UX
+- demo presentation screen
 
 ### Inputs
 
-From frontend:
+From FastAPI:
 
-- frame sample or fixture request to `/scan-frame`
-- `DynamicContext` to `/analyze-scene`
-- optional provider choice: `gemini | openai | template`
+```text
+GET /context/fixed
+GET /vision/latest-detection
+POST /sustainability/detect
+```
 
-From data:
+From Streamlit:
 
-- `data/castnet/processed/demo_profile.json`
-
-From CV:
-
-- normalized `DynamicContext`
+```text
+iframe src = http://localhost:8501?embed=true
+```
 
 ### Outputs
 
-To frontend:
+Frontend renders:
 
-- `FixedContext`
-- `DynamicContext`
-- `AnalysisJobResponse`
-- `LatestAnalysisResponse`
-- `RecommendationOutput`
-
-### Primary Endpoints
-
-```text
-GET  /health
-GET  /context/demo
-POST /scan-frame
-POST /analyze-scene
-GET  /analysis/{job_id}
-GET  /analysis/latest
-```
-
-### Fallback / Compatibility Endpoints
-
-```text
-GET  /scene/demo
-GET  /scene/demo-after-move
-POST /demo/run
-POST /recommend
-```
+- live iframe
+- current scan
+- recommendation
+- environmental context
+- risk signals
 
 ### Must Do
 
-- keep `/scan-frame` fast
-- keep `/scan-frame` accepting optional multipart `file`
-- keep `/analyze-scene` async
-- keep latest completed recommendation available
-- return pending/complete/failed status clearly
-- fall back from Gemini to OpenAI to local fallback policy
-- never require the frontend to wait on the LLM before rendering detections
+- keep UI in `/ui`
+- keep `VITE_VISION_PROVIDER=streamlit-embed` for current demo
+- do not call provider LLM APIs directly
+- keep latest recommendation visible while a new one loads
+- keep text readable on projector/screenshare
 
 ### Must Not Do
 
-- call the LLM on every frame
-- store video frames unless necessary
-- break fixture fallback
-- expose provider-specific details in frontend contracts
+- move back to `/frontend` unless team agrees
+- expose secrets in browser
+- make a landing page instead of demo screen
+- replace Streamlit vision path without testing FPS
 
 ---
 
-## Shuja / Data + Agent Contract
+## Shuja - Product / Data Story
 
 ### Owns
 
-- CASTNET profile simplification
-- agent prompt design
-- output schema expectations
-- fallback advice quality
-- data story for judges
+- product framing
+- CASTNET relevance
+- sustainability claim quality
+- judge narrative
+- advice constraints
 
 ### Inputs
-
-From data:
-
-- CASTNET fields / processed profile
 
 From backend:
 
-- `FixedContext`
-- `DynamicContext`
-- allowed actions
-- provider wrapper input
+- fixed context summary
+- CASTNET fields
+- risk flags
+- generated advice examples
 
 ### Outputs
 
-To backend:
+To team:
 
-- refined `demo_profile.json`
-- agent prompt text / rules
-- reason tags
-- fallback advice templates if needed
-
-To presentation:
-
-- short explanation of why CASTNET changes advice
-- Data Insight framing
+- what the demo should say
+- how CASTNET changes recommendations
+- which claims are safe and understandable
 
 ### Must Do
 
-- keep CASTNET visibly tied to advice
-- keep prompts schema-bounded
-- keep object/action vocabulary small
-- make same object + different environmental context produce different advice
+- make the dataset role visible
+- keep claims grounded
+- keep same-object/different-context story clear
 
 ### Must Not Do
 
-- ask the LLM to reason from raw video
-- invent unsupported environmental claims
-- overbuild CASTNET ingestion during MVP
+- imply raw video goes to LLM
+- imply CASTNET gives exact street-level health diagnosis
+- overcomplicate the demo story
 
 ---
 
-## Event Trigger Contract
+## API Shapes
 
-The event policy decides **when** to ask the agent, not what the final advice is.
+### `GET /vision/latest-detection`
 
-Backend module:
-
-```text
-backend/app/event_policy.py
-```
-
-Inputs:
-
-- `FixedContext`
-- `DynamicContext`
-- previous `EventState`
-- `environment_mode`
-
-Outputs:
-
-- `EventDecision.should_analyze`
-- `EventDecision.reason`
-- `EventDecision.advice_key`
-- `EventDecision.cooldown_remaining`
-
-Recommended triggers:
-
-- user taps Analyze Scene
-- object set changes meaningfully
-- object remains stable for 2-3 sampled frames
-- indoor/outdoor mode changes
-- CASTNET/weather mode changes
-- cooldown expires
-
-Recommended cooldown:
-
-```text
-20 seconds per advice key
-```
-
-Example advice key:
-
-```text
-outdoor_high_ozone:seed_tray,battery_pack,tarp
-```
-
----
-
-## Coordinate Contract
-
-Bounding boxes must be relative to the sampled image size.
-
-If backend receives:
+Response:
 
 ```json
 {
-  "image_width": 640,
-  "image_height": 360
+  "object_class": "aluminum_can",
+  "confidence": 0.84,
+  "bbox": null,
+  "frame_id": "frame_00123",
+  "timestamp": "2026-04-19T06:30:00Z"
 }
 ```
 
-then boxes must use that same coordinate system.
+May return `null` before the first detection.
 
-Frontend scales them:
+### `POST /sustainability/detect`
 
-```text
-display_x = bbox.x / image_width * displayed_video_width
-display_y = bbox.y / image_height * displayed_video_height
+Request:
+
+```json
+{
+  "latitude": 40.9478,
+  "longitude": -90.3712,
+  "detection": {
+    "object_class": "aluminum_can",
+    "confidence": 0.84,
+    "frame_id": "frame_00123",
+    "timestamp": "2026-04-19T06:30:00Z",
+    "bbox": null
+  }
+}
 ```
 
-Precaution:
+Response:
 
-- avoid `object-fit: cover` unless crop offsets are handled
-- prefer `object-fit: contain` or match canvas/video dimensions exactly
+```json
+{
+  "object_detected": "aluminum_can",
+  "confidence": 0.84,
+  "context": "An aluminum can was detected...",
+  "action": "Place it in the nearest recycling bin...",
+  "environment_summary": "Nearest CASTNET context is Bondville, IL...",
+  "risk_flags": ["castnet_elevated_nitrate", "weather_alert_active"],
+  "castnet_site": "Bondville, IL",
+  "decision_source": "llm_gemini"
+}
+```
+
+### `GET /context/fixed`
+
+Request:
+
+```text
+GET /context/fixed?latitude=40.9478&longitude=-90.3712
+```
+
+Response includes:
+
+- `location`
+- `castnet`
+- `weather`
+- `air_quality`
+- `weather_alerts`
+- `risk_flags`
+- `summary`
+- `source_status`
 
 ---
 
-## MVP Integration Rule
+## Integration Rules
 
-If anything is unstable, fall back in this order:
+1. The camera should never wait for an LLM.
+2. The LLM/advice layer sees structured detection data, not raw video.
+3. Advice should be cached and event-based.
+4. If Streamlit sees the object but React does not update, debug `/vision/latest-detection`.
+5. If React has a detection but no advice, debug `/sustainability/detect`.
+6. If context fails, the demo can still use deterministic fallback and CASTNET cached data.
+
+---
+
+## Final Demo Fallback Order
 
 ```text
-live YOLO -> fixture detections
-Gemini -> OpenAI -> fallback policy
-camera -> demo frame
+Streamlit YOLO -> backend /scan-frame -> manual /sustainability/detect
+Gemini -> Anthropic -> deterministic fallback
+960x540 -> 640x360
+frame_skip 1 -> frame_skip 2
 ```
-
-Do not block the demo on a single failing component.
