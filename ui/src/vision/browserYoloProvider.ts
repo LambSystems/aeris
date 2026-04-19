@@ -8,6 +8,15 @@ const MODEL_SIZE = 640;
 const MODEL_PATH = "/models/yolo/best.onnx";
 const CLASSES_PATH = "/models/yolo/classes.json";
 const CONFIDENCE_THRESHOLD = 0.25;
+const CLASS_ALIASES: Record<string, string> = {
+  bottle: "plastic_bottle",
+  cup: "paper",
+  can: "aluminum_can",
+  soda_can: "aluminum_can",
+  aluminum_can: "aluminum_can",
+  paper: "paper",
+  napkin: "paper",
+};
 
 type LetterboxMeta = {
   sourceWidth: number;
@@ -168,7 +177,7 @@ function parseDetectionRow(row: Float32Array, classNames: string[], meta: Letter
   if (width <= 1 || height <= 1) return null;
 
   return {
-    name: classNames[classIndex] ?? `class_${classIndex}`,
+    name: normalizeClassName(classNames[classIndex] ?? `class_${classIndex}`),
     confidence,
     distance: 1,
     reachable: true,
@@ -180,3 +189,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeClassName(value: string): string {
+  return CLASS_ALIASES[value] ?? value;
+}

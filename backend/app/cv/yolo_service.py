@@ -11,7 +11,12 @@ DEFAULT_MODEL_PATH = BACKEND_ROOT / "yolov8n.pt"
 CONF_THRESHOLD = 0.20
 COCO_TO_SUSTAINABILITY: dict[str, str] = {
     "bottle": "plastic_bottle",
-    "cup": "styrofoam_cup",
+    "cup": "paper",
+    "soda_can": "aluminum_can",
+    "can": "aluminum_can",
+    "aluminum_can": "aluminum_can",
+    "paper": "paper",
+    "napkin": "paper",
     "wine glass": "glass_bottle",
     "vase": "glass_bottle",
     "bowl": "food_wrapper",
@@ -25,14 +30,14 @@ COCO_TO_SUSTAINABILITY: dict[str, str] = {
     "suitcase": "plastic_bag",
 }
 ADVICE_CLASSES = {
-    "soda_can",
+    "aluminum_can",
+    "paper",
     "plastic_bottle",
     "cardboard_box",
     "cigarette_butt",
     "plastic_bag",
     "food_wrapper",
     "glass_bottle",
-    "styrofoam_cup",
 }
 
 _model: Any | None = None

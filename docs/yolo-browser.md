@@ -29,6 +29,12 @@ or:
 yolo export model=C:\path\to\best.pt format=onnx imgsz=640 simplify=True opset=12
 ```
 
+If `yolo` is not in PATH, activate the backend conda environment first or use:
+
+```powershell
+python -m ultralytics export model=C:\path\to\best.pt format=onnx imgsz=640 simplify=True opset=12
+```
+
 Copy the exported model:
 
 ```powershell
@@ -43,6 +49,22 @@ npm run dev
 ```
 
 Open `http://localhost:5173`.
+
+## Test before Gallo's model
+
+You can export the current backend YOLOv8 model:
+
+```powershell
+cd C:\Users\akuma\repos\aeris
+yolo export model=backend\yolov8n.pt format=onnx imgsz=640 simplify=True opset=12
+Copy-Item backend\yolov8n.onnx ui\public\models\yolo\best.onnx
+```
+
+For this generic COCO model, temporarily use COCO class names in `classes.json`. The demo model should use:
+
+```json
+["aluminum_can", "paper", "plastic_bottle"]
+```
 
 ## Force backend fallback
 

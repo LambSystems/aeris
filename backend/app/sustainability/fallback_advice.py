@@ -3,10 +3,20 @@ from app.sustainability.schemas import CASTNETReading, SustainabilityAdvice, YOL
 
 
 OBJECT_FACTS = {
+    "aluminum_can": {
+        "material": "aluminum",
+        "concern": "can persist for decades if littered even though it is highly recyclable",
+        "action": "Empty it and place it in a metals or mixed recycling bin.",
+    },
     "soda_can": {
         "material": "aluminum",
         "concern": "can persist for decades if littered even though it is highly recyclable",
         "action": "Place it in a recycling bin that accepts aluminum cans.",
+    },
+    "paper": {
+        "material": "paper fiber",
+        "concern": "loses recycling value when wet or contaminated and can move through stormwater as litter",
+        "action": "If it is clean and dry, place it in paper recycling; if it is wet or food-soiled, compost it where available or discard it.",
     },
     "plastic_bottle": {
         "material": "PET plastic",
@@ -86,9 +96,9 @@ def _prioritized_action(
 
     flags = set(fixed_context.risk_flags)
     object_class = detection.object_class
-    if "wind_can_spread_litter" in flags and object_class in {"plastic_bag", "food_wrapper", "styrofoam_cup"}:
+    if "wind_can_spread_litter" in flags and object_class in {"plastic_bag", "food_wrapper", "styrofoam_cup", "paper"}:
         return f"Pick it up before wind spreads it, then {base_action[0].lower()}{base_action[1:]}"
-    if "rain_can_move_pollutants_to_stormwater" in flags and object_class in {"cigarette_butt", "food_wrapper", "plastic_bottle"}:
+    if "rain_can_move_pollutants_to_stormwater" in flags and object_class in {"cigarette_butt", "food_wrapper", "plastic_bottle", "paper"}:
         return f"Remove it before runoff carries residue, then {base_action[0].lower()}{base_action[1:]}"
     if "weather_alert_active" in flags:
         return f"If it is safe to do so, {base_action[0].lower()}{base_action[1:]}"
