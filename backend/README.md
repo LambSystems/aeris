@@ -45,7 +45,7 @@ POST /demo/run
 POST /scan
 ```
 
-`/scan-frame` and `/scan` are currently safe fixture-backed endpoints. Replace the stub in `app/cv/yolo_service.py` when YOLO is ready.
+`/scan-frame` accepts an optional multipart image field named `file`. If no file is sent, or while YOLO is not wired, it returns fixture detections. Replace `detect_objects()` in `app/cv/yolo_service.py` when YOLO is ready.
 
 `/analyze-scene` is the async agentic decision path. It returns a job id immediately while Gemini/OpenAI/fallback analysis runs in the background.
 
@@ -72,6 +72,51 @@ Backend returns:
 
 Do not call the agent for every frame. `/scan-frame` should stay fast. `/analyze-scene` should start a background job and return immediately.
 
+## Event Policy
+
+`app/event_policy.py` is the backend gate that decides whether a scene update is worth an async agent call.
+
+Inputs:
+
+- `FixedContext`
+- `DynamicContext`
+- previous `EventState`
+- `environment_mode`: `indoor` or `outdoor`
+
+Outputs:
+
+- `should_analyze`
+- `reason`
+- `advice_key`
+- `cooldown_remaining`
+
+For now this module is intentionally pure and not wired into `main.py`, so it can be merged safely after the YOLO endpoint work lands.
+
+## Smoke Test
+
+With the backend running, from the repo root:
+
+```bash
+python scripts\smoke_backend.py
+```
+
+If you are still inside `backend`, run `python ..\scripts\smoke_backend.py`.
+If the API runs somewhere else, set `AERIS_API_URL`.
+
+Expected output includes:
+
+```text
+health: True
+scan-frame: yolo_fixture / 7 objects
+recommendation: agentic_gemini -> protect_first seed_tray
+```
+
+Policy/fallback checks that do not need the server:
+
+```bash
+python scripts\test_backend_policy.py
+```
+
 ## YOLO Adapter Contract
 
 Replace `app/cv/yolo_service.py` with real YOLO inference when ready, but keep this output shape:
@@ -79,6 +124,8 @@ Replace `app/cv/yolo_service.py` with real YOLO inference when ready, but keep t
 ```json
 {
   "source": "yolo",
+  "frame_width": 960,
+  "frame_height": 540,
   "objects": [
     {
       "name": "seed_tray",

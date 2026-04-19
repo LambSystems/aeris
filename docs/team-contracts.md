@@ -95,6 +95,8 @@ Shape:
 ```json
 {
   "source": "yolo",
+  "frame_width": 960,
+  "frame_height": 540,
   "objects": [
     {
       "name": "seed_tray",
@@ -192,13 +194,13 @@ To backend:
 
 For backend YOLO:
 
-- sampled camera frame to `/scan-frame` once implemented with image upload
+- sampled camera frame to `/scan-frame` as multipart form field `file`
 
 For fixture or browser-side detection:
 
 - `DynamicContext` JSON to `/analyze-scene`
 
-For MVP, if image upload is not ready, use fixture detections and send that `DynamicContext`.
+For MVP, if image upload is not ready, omit `file` on `/scan-frame` to get fixture detections, then send that `DynamicContext`.
 
 ### Must Do
 
@@ -261,6 +263,7 @@ From data/team:
 To backend/frontend:
 
 - `DynamicContext`
+- implementation hook: `backend/app/cv/yolo_service.py::detect_objects(image_bytes, filename, content_type)`
 
 Required object fields:
 
@@ -297,6 +300,7 @@ unknown                             -> misc_item
 ### Must Do
 
 - return boxes in the same coordinate space as the sampled frame
+- return `frame_width` and `frame_height` when available
 - include confidence scores
 - keep output schema stable
 - keep fixture output available
@@ -371,6 +375,7 @@ POST /recommend
 ### Must Do
 
 - keep `/scan-frame` fast
+- keep `/scan-frame` accepting optional multipart `file`
 - keep `/analyze-scene` async
 - keep latest completed recommendation available
 - return pending/complete/failed status clearly
@@ -441,6 +446,26 @@ To presentation:
 ## Event Trigger Contract
 
 The event policy decides **when** to ask the agent, not what the final advice is.
+
+Backend module:
+
+```text
+backend/app/event_policy.py
+```
+
+Inputs:
+
+- `FixedContext`
+- `DynamicContext`
+- previous `EventState`
+- `environment_mode`
+
+Outputs:
+
+- `EventDecision.should_analyze`
+- `EventDecision.reason`
+- `EventDecision.advice_key`
+- `EventDecision.cooldown_remaining`
 
 Recommended triggers:
 

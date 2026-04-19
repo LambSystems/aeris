@@ -44,6 +44,8 @@ class DynamicContext(BaseModel):
 
     objects: list[SceneObject]
     source: str = "fixture"
+    frame_width: int | None = None
+    frame_height: int | None = None
 
 
 class RecommendationRequest(BaseModel):

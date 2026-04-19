@@ -1,10 +1,10 @@
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
-from app.cv.yolo_service import scan_demo_frame
+from app.cv.yolo_service import detect_objects, scan_demo_frame
 from app.data import load_demo_context, load_scene
 from app.fallback_policy import build_fallback_recommendations
 from app.schemas import (
@@ -60,8 +60,16 @@ def get_demo_scene_after_move() -> DynamicContext:
 
 
 @app.post("/scan-frame", response_model=DynamicContext)
-def scan_frame() -> DynamicContext:
-    return scan_demo_frame()
+async def scan_frame(file: UploadFile | None = File(default=None)) -> DynamicContext:
+    if file is None:
+        return scan_demo_frame()
+
+    image_bytes = await file.read()
+    return detect_objects(
+        image_bytes=image_bytes,
+        filename=file.filename,
+        content_type=file.content_type,
+    )
 
 
 @app.post("/analyze-scene", response_model=AnalysisJobResponse)

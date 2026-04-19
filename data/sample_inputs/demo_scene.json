@@ -1,5 +1,7 @@
 {
   "source": "fixture",
+  "frame_width": 960,
+  "frame_height": 540,
   "objects": [
     {
       "name": "seed_tray",
@@ -87,4 +89,3 @@
     }
   ]
 }
-
