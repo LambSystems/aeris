@@ -22,23 +22,23 @@ export default function Page() {
 
   const [airQuality, setAirQuality] = useState("Loading...")
   const [location, setLocation] = useState("Detecting...")
+
   const [entered, setEntered] = useState(false)
+  const [activeTab, setActiveTab] = useState("home")
 
+  // 🎥 Camera (only after entering)
   useEffect(() => {
-  if (!entered) return
+    if (!entered) return
 
-  async function startCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
-    })
-    if (videoRef.current) videoRef.current.srcObject = stream
-  }
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      })
+      if (videoRef.current) videoRef.current.srcObject = stream
+    }
 
-  startCamera()
-}, [entered])
-
-  // 🎥 Camera
- 
+    startCamera()
+  }, [entered])
 
   // 🧠 Detection
   useEffect(() => {
@@ -133,7 +133,6 @@ export default function Page() {
 
   const d = renderBoxes.current[0]
 
-  // 🧠 Recommendation logic (CORE CHANGE)
   const recommendation = useMemo(() => {
     if (!detectedObject) return "Scanning..."
 
@@ -156,64 +155,111 @@ export default function Page() {
     return "Environment stable"
   }, [detectedObject, airQuality])
 
+  // 🌍 LANDING PAGE
   if (!entered) {
-  return (
-    <div className="h-screen w-screen relative overflow-hidden text-white">
+    return (
+      <div className="h-screen w-screen relative overflow-hidden text-white">
 
-      {/* 🌍 VIDEO BACKGROUND */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-      >
-        <source src="/earth.mp4" type="video/mp4" />
-      </video>
+        {/* VIDEO */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/earth.mp4" type="video/mp4" />
+        </video>
 
-      {/* DARK OVERLAY */}
-      <div className="absolute inset-0 bg-black/50" />
+        {/* OVERLAY */}
+        <div className="absolute inset-0 bg-black/50" />
 
-      {/* NAVBAR */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex justify-between items-center px-10 py-6">
-        <h1 className="text-2xl font-semibold">AEIRS</h1>
+        {/* NAVBAR */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex justify-between items-center px-10 py-6">
+          <h1 className="text-2xl font-semibold">AEIRS</h1>
 
-        <div className="hidden md:flex gap-8 text-sm text-white/90">
-          <span>Home</span>
-          <span>Features</span>
-          <span>Impact</span>
-          <span>How it Works</span>
+          <div className="relative hidden md:flex gap-10 text-sm text-white/90">
+            {["home", "features", "impact"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="relative pb-1 capitalize"
+              >
+                {tab}
+                {activeTab === tab && (
+                  <div className="absolute left-0 bottom-0 w-full h-[2px] bg-blue-400" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* HERO TEXT */}
-      <div className="relative z-10 flex h-full items-center px-16">
-        <div className="max-w-xl">
-          <h1 className="text-5xl font-bold mb-6">
-            Track Your Air. <br /> Shape Safer Spaces.
-          </h1>
+        {/* CONTENT */}
+        <div className="relative z-10 flex h-full items-center px-16">
+          <div className="max-w-xl">
 
-          <p className="text-white/80 mb-8">
-            AI-powered environmental awareness system.
-          </p>
+            {activeTab === "home" && (
+              <>
+                <h1 className="text-5xl font-bold mb-6">
+                  Track Your Air. <br /> Shape Safer Spaces.
+                </h1>
 
-          <button
-            onClick={() => setEntered(true)}
-            className="bg-white/10 border border-white/30 px-6 py-3 rounded-full backdrop-blur-md hover:bg-white/20 transition"
-          >
-            Step into AEIRS
-          </button>
+                <p className="text-white/80 mb-8">
+                  AI-powered environmental awareness system.
+                </p>
+
+                <button
+                  onClick={() => setEntered(true)}
+                  className="bg-white/10 border border-white/30 px-6 py-3 rounded-full backdrop-blur-md hover:bg-white/20 transition"
+                >
+                  Step into AEIRS
+                </button>
+              </>
+            )}
+
+            {activeTab === "features" && (
+              <>
+                <h1 className="text-5xl font-bold mb-6">
+                  Powerful Real-Time Detection
+                </h1>
+
+                <p className="text-white/80 mb-8">
+                  AEIRS detects objects and combines them with environmental
+                  signals to generate real-time insights.
+                  <br /><br />
+                  • Object detection  
+                  • Air quality awareness  
+                  • Smart recommendations  
+                </p>
+              </>
+            )}
+
+            {activeTab === "impact" && (
+              <>
+                <h1 className="text-5xl font-bold mb-6">
+                  Driving Environmental Awareness
+                </h1>
+
+                <p className="text-white/80 mb-8">
+                  AEIRS helps people make safer and smarter decisions by linking
+                  their surroundings with environmental data.
+                  <br /><br />
+                  Reduce exposure. Improve habits. Build healthier communities.
+                </p>
+              </>
+            )}
+
+          </div>
         </div>
+
       </div>
+    )
+  }
 
-    </div>
-  )
-}
-
+  // 📷 AEIRS SCREEN
   return (
     <div className="h-screen w-screen bg-black relative overflow-hidden">
 
-      {/* Camera */}
       <video
         ref={videoRef}
         autoPlay
@@ -221,10 +267,8 @@ export default function Page() {
         className="absolute w-full h-full object-cover"
       />
 
-      {/* Canvas */}
       <canvas ref={canvasRef} className="absolute w-full h-full" />
 
-      {/* 🔗 Line → BOX → RECOMMENDATION */}
       {d && (
         <svg className="absolute w-full h-full pointer-events-none">
           <line
@@ -238,7 +282,6 @@ export default function Page() {
         </svg>
       )}
 
-      {/* 💬 RECOMMENDATION (FOLLOWS BOX) */}
       {d && (
         <div
           className="absolute bg-white/95 p-3 rounded-xl shadow-lg text-black text-xs w-48"
@@ -252,10 +295,8 @@ export default function Page() {
         </div>
       )}
 
-      {/* RIGHT PANELS */}
       <div className="absolute top-4 right-4 flex flex-col gap-4 w-56">
 
-        {/* DETECTED */}
         <div className="bg-white/95 p-3 rounded-xl shadow-lg text-black text-xs">
           <h2 className="font-semibold mb-1">Detected Objects</h2>
           {detectedObject ? (
@@ -267,7 +308,6 @@ export default function Page() {
           )}
         </div>
 
-        {/* USERS */}
         <div className="bg-white/85 p-3 rounded-xl shadow-lg text-black text-xs">
           <h2 className="font-semibold mb-1">Users</h2>
           <p>🌫️ {airQuality}</p>
