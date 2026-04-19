@@ -6,79 +6,136 @@ import { formatObjectName, formatConfidence } from "@/lib/format";
 
 interface CameraViewportProps {
   videoRef: React.RefObject<HTMLVideoElement>;
-  objects: DetectedObject[];
-  frameWidth: number;
-  frameHeight: number;
+  /** Live ref the hook writes post-NMS detections into. Read every animation frame. */
+  objectsRef: React.MutableRefObject<DetectedObject[]>;
+  /** Live ref with source frame dimensions for the canvas draw's scale calc. */
+  frameSizeRef: React.MutableRefObject<{ width: number; height: number }>;
   scanning: boolean;
   cameraReady: boolean;
+  hasDetections: boolean;
   errorMessage?: string | null;
 }
 
 export function CameraViewport({
   videoRef,
-  objects,
-  frameWidth,
-  frameHeight,
+  objectsRef,
+  frameSizeRef,
   scanning,
   cameraReady,
+  hasDetections,
   errorMessage,
 }: CameraViewportProps) {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Canvas pixel size cache — only rewritten when the container actually resizes.
+  const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
 
-  // Draw bounding boxes; redraws when objects change or container resizes.
+  // Set canvas dimensions once and on container resize ONLY. Resetting canvas.width/height
+  // reallocates the backing buffer, so doing it every frame is a massive perf hit.
   useEffect(() => {
     const canvas = overlayRef.current;
     const container = containerRef.current;
-    const video = videoRef.current;
-    if (!canvas || !container || !video) return;
+    if (!canvas || !container) return;
 
-    const draw = () => {
+    const resize = () => {
       const rect = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      const nextW = Math.round(rect.width);
+      const nextH = Math.round(rect.height);
+      if (nextW === sizeRef.current.width && nextH === sizeRef.current.height && dpr === sizeRef.current.dpr) {
+        return;
+      }
+      canvas.width = nextW * dpr;
+      canvas.height = nextH * dpr;
+      canvas.style.width = `${nextW}px`;
+      canvas.style.height = `${nextH}px`;
+      sizeRef.current = { width: nextW, height: nextH, dpr };
+    };
+
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
+
+  // Single rAF loop: draws the video frame + boxes into one canvas each animation frame.
+  // The <video> element is hidden — it's only the pixel source for drawImage.
+  useEffect(() => {
+    const canvas = overlayRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    let raf = 0;
+    let running = true;
+    const stroke = getCssVar("--detect-stroke");
+
+    const draw = () => {
+      if (!running) return;
+
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+
+      const { width, height, dpr } = sizeRef.current;
+      if (!width || !height) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, width, height);
 
-      const sourceW = frameWidth || video.videoWidth || rect.width;
-      const sourceH = frameHeight || video.videoHeight || rect.height;
-      if (!sourceW || !sourceH) return;
+      const videoW = video.videoWidth;
+      const videoH = video.videoHeight;
+      if (!videoW || !videoH || video.readyState < 2) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
 
-      // object-cover style mapping (video is object-cover in DOM)
-      const scale = Math.max(rect.width / sourceW, rect.height / sourceH);
-      const dispW = sourceW * scale;
-      const dispH = sourceH * scale;
-      const offsetX = (rect.width - dispW) / 2;
-      const offsetY = (rect.height - dispH) / 2;
+      // object-cover mapping: fill the container, crop overflow evenly.
+      const scale = Math.max(width / videoW, height / videoH);
+      const dispW = videoW * scale;
+      const dispH = videoH * scale;
+      const offsetX = (width - dispW) / 2;
+      const offsetY = (height - dispH) / 2;
 
-      const stroke = getCssVar("--detect-stroke");
+      // 1. Draw the live video frame directly onto the canvas.
+      ctx.drawImage(video, offsetX, offsetY, dispW, dispH);
+
+      // 2. Overlay detection boxes using the same coord space as the video pixels.
+      // Detection coords are in the inference-source frame space, which may differ
+      // from video.videoWidth/Height, so scale from frameSizeRef if it's populated.
+      const frameSize = frameSizeRef.current;
+      const sourceW = frameSize.width || videoW;
+      const sourceH = frameSize.height || videoH;
+      const boxScaleX = dispW / sourceW;
+      const boxScaleY = dispH / sourceH;
+
       ctx.lineWidth = 2;
       ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+      ctx.strokeStyle = `hsl(${stroke})`;
+      ctx.shadowColor = `hsl(${stroke} / 0.4)`;
 
-      objects.forEach((o) => {
-        const x = offsetX + o.bbox.x * scale;
-        const y = offsetY + o.bbox.y * scale;
-        const w = o.bbox.width * scale;
-        const h = o.bbox.height * scale;
+      const objects = objectsRef.current;
+      for (let i = 0; i < objects.length; i++) {
+        const o = objects[i];
+        const x = offsetX + o.bbox.x * boxScaleX;
+        const y = offsetY + o.bbox.y * boxScaleY;
+        const w = o.bbox.width * boxScaleX;
+        const h = o.bbox.height * boxScaleY;
 
-        ctx.strokeStyle = `hsl(${stroke})`;
-        ctx.shadowColor = `hsl(${stroke} / 0.4)`;
         ctx.shadowBlur = 6;
         roundRect(ctx, x, y, w, h, 8);
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Corner ticks
         ctx.lineWidth = 3;
         const tick = Math.min(18, w / 4, h / 4);
         cornerTicks(ctx, x, y, w, h, tick);
+        ctx.lineWidth = 2;
 
-        // Label pill
         const label = `${formatObjectName(o.name)} · ${formatConfidence(o.confidence)}`;
         const padX = 8;
         const padY = 4;
@@ -91,14 +148,17 @@ export function CameraViewport({
         ctx.fill();
         ctx.fillStyle = "hsl(215 28% 9%)";
         ctx.fillText(label, x + padX, labelY + labelH - padY - 2);
-      });
+      }
+
+      raf = requestAnimationFrame(draw);
     };
 
     draw();
-    const ro = new ResizeObserver(draw);
-    ro.observe(container);
-    return () => ro.disconnect();
-  }, [objects, frameWidth, frameHeight, videoRef]);
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+  }, [objectsRef, frameSizeRef, videoRef]);
 
   return (
     <div
@@ -108,16 +168,19 @@ export function CameraViewport({
         "shadow-[0_1px_0_hsl(var(--border)),0_24px_60px_-30px_hsl(var(--foreground)/0.35)]",
       )}
     >
+      {/* Hidden source — the canvas samples frames from this element via drawImage. */}
       <video
         ref={videoRef}
         autoPlay
         muted
         playsInline
-        className="h-full w-full object-cover"
+        aria-hidden
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
       />
+      {/* The single surface the user actually sees: video frame + boxes composited. */}
       <canvas
         ref={overlayRef}
-        className="pointer-events-none absolute inset-0 h-full w-full"
+        className="block h-full w-full"
       />
 
       {/* Cinematic frame */}
@@ -152,7 +215,7 @@ export function CameraViewport({
         </div>
       ) : null}
 
-      {cameraReady && scanning && objects.length === 0 ? (
+      {cameraReady && scanning && !hasDetections ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
           <div className="flex items-center gap-2 rounded-full bg-background/85 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
             <Loader2 className="h-3 w-3 animate-spin" />

@@ -10,6 +10,7 @@ const HIGH_CONFIDENCE = 0.72;
 const SWITCH_MARGIN = 0.18;
 
 interface UseCameraScannerOptions {
+  /** @deprecated Kept for backwards compatibility; the loop now runs as fast as inference allows. */
   intervalMs?: number;
   enabled: boolean;
 }
@@ -18,9 +19,14 @@ interface UseCameraScannerReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   cameraReady: boolean;
   cameraError: string | null;
-  objects: DetectedObject[];
-  frameWidth: number;
-  frameHeight: number;
+  /** Live ref for the canvas rAF draw loop — bypasses React renders. Always latest post-NMS detections. */
+  objectsRef: React.MutableRefObject<DetectedObject[]>;
+  /** Live ref for source frame dimensions — used by the canvas draw for scaling. */
+  frameSizeRef: React.MutableRefObject<{ width: number; height: number }>;
+  /** Coarse React state — only updated when detection count changes, for UI chrome ("+N more"). */
+  objectCount: number;
+  /** Single debounced object used to trigger the Claude advice call without flickering. */
+  stablePrimary: DetectedObject | null;
   lastFrameId: string | null;
   lastTimestamp: string | null;
   scanning: boolean;
@@ -28,23 +34,23 @@ interface UseCameraScannerReturn {
 }
 
 export function useCameraScanner({
-  intervalMs = 700,
   enabled,
 }: UseCameraScannerOptions): UseCameraScannerReturn {
   const videoRef = useRef<HTMLVideoElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const inFlightRef = useRef(false);
-  const intervalRef = useRef<number | null>(null);
   const providerRef = useRef<VisionProvider | null>(null);
   const historyRef = useRef<DetectionSample[]>([]);
   const stableObjectsRef = useRef<DetectedObject[]>([]);
   const lastStableAtRef = useRef(0);
 
+  // Live refs — written on every inference, read on every animation frame. No React re-render.
+  const objectsRef = useRef<DetectedObject[]>([]);
+  const frameSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [objects, setObjects] = useState<DetectedObject[]>([]);
-  const [frameWidth, setFrameWidth] = useState(0);
-  const [frameHeight, setFrameHeight] = useState(0);
+  const [objectCount, setObjectCount] = useState(0);
+  const [stablePrimary, setStablePrimary] = useState<DetectedObject | null>(null);
   const [lastFrameId, setLastFrameId] = useState<string | null>(null);
   const [lastTimestamp, setLastTimestamp] = useState<string | null>(null);
   const [visionSource, setVisionSource] = useState<VisionProviderSource | "loading">("loading");
@@ -116,7 +122,8 @@ export function useCameraScanner({
     if (!video || video.readyState < 2) return null;
     const sourceW = video.videoWidth;
     const sourceH = video.videoHeight;
-    const scale = Math.min(1, 960 / sourceW);
+    // Capture near the model's input size — faster encode, no loss of detail.
+    const scale = Math.min(1, 720 / sourceW);
     const w = Math.round(sourceW * scale);
     const h = Math.round(sourceH * scale);
     if (!w || !h) return null;
@@ -134,47 +141,78 @@ export function useCameraScanner({
     );
   }, []);
 
-  // Polling loop
+  // Continuous inference loop — each frame starts right after the previous completes.
   useEffect(() => {
     if (!enabled || !cameraReady) return;
 
-    async function tick() {
-      if (inFlightRef.current) return;
-      inFlightRef.current = true;
+    let stopped = false;
+
+    let lastCount = -1;
+    let lastStableKey = "";
+
+    const runOnce = async () => {
       try {
-        const blob = await captureFrame();
-        if (!blob) return;
         const provider = providerRef.current;
         if (!provider) return;
+        const blob = await captureFrame();
+        if (!blob || stopped) return;
         const result: ScanFrameResponse = await provider.detect(blob);
-        setVisionSource(provider.source);
-        setObjects(stabilizeDetections(result.objects ?? [], Date.now()));
-        setFrameWidth(result.frame_width);
-        setFrameHeight(result.frame_height);
-        const fid = `frame_${Date.now()}`;
-        setLastFrameId(fid);
-        setLastTimestamp(new Date().toISOString());
+        if (stopped) return;
+
+        const raw = result.objects ?? [];
+
+        // Hot path: write to refs so the canvas rAF loop paints the boxes instantly.
+        objectsRef.current = raw;
+        frameSizeRef.current = { width: result.frame_width, height: result.frame_height };
+
+        // Cold path: only touch React state when the visible UI actually needs to re-render.
+        if (raw.length !== lastCount) {
+          lastCount = raw.length;
+          setObjectCount(raw.length);
+        }
+
+        const stable = stabilizeDetections(raw, Date.now())[0] ?? null;
+        const stableKey = stable ? `${stable.name}:${stable.confidence.toFixed(2)}` : "";
+        if (stableKey !== lastStableKey) {
+          lastStableKey = stableKey;
+          setStablePrimary(stable);
+          setLastFrameId(`frame_${Date.now()}`);
+          setLastTimestamp(new Date().toISOString());
+        }
       } catch {
         // swallow — keep last detection visible (avoids flicker)
-      } finally {
-        inFlightRef.current = false;
       }
-    }
-
-    tick();
-    intervalRef.current = window.setInterval(tick, intervalMs);
-    return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
-  }, [enabled, cameraReady, intervalMs, captureFrame]);
+
+    const schedule = () => {
+      if (stopped) return;
+      // rAF aligns with display refresh; inference itself is the real throttle.
+      requestAnimationFrame(async () => {
+        if (stopped) return;
+        if (!providerRef.current) {
+          // Provider still loading — retry shortly.
+          window.setTimeout(schedule, 80);
+          return;
+        }
+        await runOnce();
+        schedule();
+      });
+    };
+
+    schedule();
+    return () => {
+      stopped = true;
+    };
+  }, [enabled, cameraReady, captureFrame]);
 
   return {
     videoRef,
     cameraReady,
     cameraError,
-    objects,
-    frameWidth,
-    frameHeight,
+    objectsRef,
+    frameSizeRef,
+    objectCount,
+    stablePrimary,
     lastFrameId,
     lastTimestamp,
     scanning: enabled && cameraReady,

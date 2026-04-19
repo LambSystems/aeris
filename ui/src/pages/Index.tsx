@@ -44,13 +44,14 @@ const LiveScannerPage = () => {
     videoRef,
     cameraReady,
     cameraError,
-    objects,
-    frameWidth,
-    frameHeight,
+    objectsRef,
+    frameSizeRef,
+    objectCount,
+    stablePrimary,
     lastFrameId,
     lastTimestamp,
     visionSource,
-  } = useCameraScanner({ enabled: scanning, intervalMs: 700 });
+  } = useCameraScanner({ enabled: scanning });
 
   // Try to grab user geolocation once; fall back to default silently.
   useEffect(() => {
@@ -86,11 +87,9 @@ const LiveScannerPage = () => {
     };
   }, [coords.lat, coords.lng]);
 
-  // Pick top-confidence detection as the "primary" focus.
-  const primaryObject: DetectedObject | null = useMemo(() => {
-    if (!objects.length) return null;
-    return [...objects].sort((a, b) => b.confidence - a.confidence)[0];
-  }, [objects]);
+  // Stable primary used for advice + status text (debounced to avoid flicker).
+  // All raw `objects` still render as live boxes on the canvas.
+  const primaryObject: DetectedObject | null = stablePrimary;
 
   // Recommendation. Throttled by primary object identity to prevent flicker.
   const [recommendation, setRecommendation] =
@@ -184,11 +183,11 @@ const LiveScannerPage = () => {
         <section className="flex flex-col gap-3">
           <CameraViewport
             videoRef={videoRef}
-            objects={objects}
-            frameWidth={frameWidth}
-            frameHeight={frameHeight}
+            objectsRef={objectsRef}
+            frameSizeRef={frameSizeRef}
             scanning={scanning}
             cameraReady={cameraReady}
+            hasDetections={objectCount > 0}
             errorMessage={cameraError}
           />
 
@@ -208,9 +207,9 @@ const LiveScannerPage = () => {
                     ? "Searching for objects…"
                     : "Scanning paused"}
               </span>
-              {objects.length > 1 ? (
+              {objectCount > 1 ? (
                 <span className="text-xs text-muted-foreground">
-                  +{objects.length - 1} more
+                  +{objectCount - 1} more
                 </span>
               ) : null}
             </div>
