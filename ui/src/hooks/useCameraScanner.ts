@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { scanFrame } from "@/lib/api";
 import type { DetectedObject, ScanFrameResponse } from "@/lib/types";
 
+const STABILITY_WINDOW_MS = 2200;
+const KEEP_ALIVE_MS = 1400;
+const MIN_HITS = 2;
+const HIGH_CONFIDENCE = 0.72;
+const SWITCH_MARGIN = 0.18;
+
 interface UseCameraScannerOptions {
   intervalMs?: number;
   enabled: boolean;
@@ -27,6 +33,9 @@ export function useCameraScanner({
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const inFlightRef = useRef(false);
   const intervalRef = useRef<number | null>(null);
+  const historyRef = useRef<DetectionSample[]>([]);
+  const stableObjectsRef = useRef<DetectedObject[]>([]);
+  const lastStableAtRef = useRef(0);
 
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -107,7 +116,7 @@ export function useCameraScanner({
         const blob = await captureFrame();
         if (!blob) return;
         const result: ScanFrameResponse = await scanFrame(blob);
-        setObjects(result.objects ?? []);
+        setObjects(stabilizeDetections(result.objects ?? [], Date.now()));
         setFrameWidth(result.frame_width);
         setFrameHeight(result.frame_height);
         const fid = `frame_${Date.now()}`;
@@ -138,4 +147,94 @@ export function useCameraScanner({
     lastTimestamp,
     scanning: enabled && cameraReady,
   };
+
+  function stabilizeDetections(rawObjects: DetectedObject[], now: number): DetectedObject[] {
+    const candidates = rawObjects.filter((object) => object.bbox && object.confidence >= 0.18);
+    historyRef.current = [...historyRef.current, { at: now, objects: candidates }].filter(
+      (sample) => now - sample.at <= STABILITY_WINDOW_MS,
+    );
+
+    const scored = scoreStableCandidates(historyRef.current);
+    const previous = stableObjectsRef.current[0] ?? null;
+    const next = chooseStableCandidate(scored, previous);
+
+    if (next) {
+      stableObjectsRef.current = [next];
+      lastStableAtRef.current = now;
+      return stableObjectsRef.current;
+    }
+
+    if (previous && now - lastStableAtRef.current <= KEEP_ALIVE_MS) {
+      return stableObjectsRef.current;
+    }
+
+    stableObjectsRef.current = [];
+    return [];
+  }
+}
+
+type DetectionSample = {
+  at: number;
+  objects: DetectedObject[];
+};
+
+type CandidateScore = {
+  name: string;
+  hits: number;
+  averageConfidence: number;
+  score: number;
+  latest: DetectedObject;
+};
+
+function scoreStableCandidates(samples: DetectionSample[]): CandidateScore[] {
+  const byName = new Map<string, DetectedObject[]>();
+
+  for (const sample of samples) {
+    const bestByName = new Map<string, DetectedObject>();
+    for (const object of sample.objects) {
+      const existing = bestByName.get(object.name);
+      if (!existing || object.confidence > existing.confidence) {
+        bestByName.set(object.name, object);
+      }
+    }
+    for (const [name, object] of bestByName) {
+      byName.set(name, [...(byName.get(name) ?? []), object]);
+    }
+  }
+
+  return [...byName.entries()]
+    .map(([name, objects]) => {
+      const latest = objects[objects.length - 1];
+      const averageConfidence = objects.reduce((sum, object) => sum + object.confidence, 0) / objects.length;
+      return {
+        name,
+        hits: objects.length,
+        averageConfidence,
+        score: objects.length * 0.65 + averageConfidence,
+        latest: {
+          ...latest,
+          confidence: Math.max(latest.confidence, averageConfidence),
+        },
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+function chooseStableCandidate(scored: CandidateScore[], previous: DetectedObject | null): DetectedObject | null {
+  const best = scored[0];
+  if (!best) return null;
+
+  const previousScore = previous ? scored.find((candidate) => candidate.name === previous.name) : null;
+  if (previous && previousScore) {
+    const shouldKeepPrevious =
+      previousScore.hits >= 1 &&
+      best.name !== previous.name &&
+      best.score < previousScore.score + SWITCH_MARGIN &&
+      best.hits < 3;
+    if (shouldKeepPrevious) return { ...previousScore.latest, name: previous.name };
+  }
+
+  const isStable = best.hits >= MIN_HITS || best.averageConfidence >= HIGH_CONFIDENCE;
+  if (!isStable && previous?.name === best.name) return best.latest;
+  return isStable ? best.latest : null;
 }
