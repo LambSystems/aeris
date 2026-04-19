@@ -8,6 +8,8 @@ config.toml
 backend/datasets/trash_quick/
 backend/.cache/yolo-runs/
 
+new_dataset/
+
 # Node
 node_modules/
 dist/
