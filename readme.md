@@ -49,7 +49,7 @@ aeris/
 │   │       ├── castnet_mock.py      # Mock CASTNET data — swap for real API
 │   │       └── adviser.py           # Prompt + Claude call + response parsing
 │   └── streamlit_app.py             # Dev UI for testing detections manually
-├── frontend/                        # React / Vite / Tailwind
+├── frontend/                        # Next.js (React, TypeScript, Tailwind)
 ├── data/
 └── docs/
 ```
@@ -90,11 +90,12 @@ streamlit run streamlit_app.py
 ```bash
 cd frontend
 npm install
+cp .env.example .env.local   # optional: set NEXT_PUBLIC_API_URL / NEXT_PUBLIC_AERIS_PROVIDER
 npm run dev
-# → http://localhost:5173
+# → http://localhost:3000
 ```
 
-The frontend falls back to mock data if the backend is not running.
+The UI calls the FastAPI server at `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). Run `uvicorn` first; the landing screen shows API status after you enter the experience.
 
 ---
 
@@ -165,7 +166,7 @@ Only fire this when YOLO confidence is ≥ 0.90. The call takes ~1–2 seconds (
 | Backend | FastAPI, Python, Pydantic |
 | LLM | Claude (Anthropic) via `claude-sonnet-4-6` |
 | Environmental Data | CASTNET (Clean Air Status and Trends Network) |
-| Frontend | React, Vite, TypeScript, Tailwind |
+| Frontend | Next.js, React, TypeScript, Tailwind |
 | Dev UI | Streamlit |
 
 ---
