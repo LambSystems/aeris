@@ -34,6 +34,41 @@ The intended live UI flow is:
 
 `/demo/run` still exists as a compatibility fallback for quick demos.
 
+## Frontend Input / Output Contract
+
+See `../docs/team-contracts.md` for the full team handoff contract.
+
+Frontend owns:
+
+- camera/demo frame display
+- sampling frames, if backend YOLO is used
+- drawing boxes and labels
+- triggering analysis
+- polling analysis jobs
+- rendering latest advice
+
+Frontend receives:
+
+- `FixedContext` from `/context/demo`
+- `DynamicContext` from `/scan-frame` or fixture/mock data
+- `AnalysisJobResponse` from `/analyze-scene`
+- `RecommendationOutput` from `/analysis/{job_id}`
+
+Frontend sends:
+
+- sampled frames to `/scan-frame` once image upload is wired, or
+- `DynamicContext` JSON to `/analyze-scene`
+
+Precautions:
+
+- do not run Gemini/OpenAI in the browser
+- do not expose API keys
+- do not block the camera while analysis is pending
+- do not send every frame
+- do not start a new detection request while one is pending
+- keep old boxes visible until new boxes arrive
+- keep demo-frame/mock fallback working
+
 ## Lovable
 
 If Lovable is used, generate the actual split-screen demo UI from `docs/interface-concept.md`, then preserve `src/api.ts` and the response types so it can still connect to Piero's backend.

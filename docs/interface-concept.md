@@ -12,6 +12,8 @@ The UI should not feel like a generic dashboard, a chatbot, or a full 3D simulat
 
 Chau may use **Lovable** to generate the first frontend pass. If so, Lovable should generate the actual demo interface described here, not a landing page or marketing site.
 
+For exact frontend inputs/outputs, see `docs/team-contracts.md`.
+
 ---
 
 ## Design Goal

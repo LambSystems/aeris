@@ -167,6 +167,8 @@ The fallback policy exists only for safety.
 
 ## API Contract
 
+See `docs/team-contracts.md` for owner-by-owner inputs and outputs.
+
 ### Core Endpoints
 
 ```text

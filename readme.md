@@ -233,6 +233,8 @@ The frontend falls back to mock data if the backend is not running.
 
 ## Build Priorities
 
+See [docs/team-contracts.md](docs/team-contracts.md) for exact inputs and outputs between team members.
+
 ### Piero / Backend
 
 - keep the FastAPI contract stable
@@ -260,6 +262,31 @@ The frontend falls back to mock data if the backend is not running.
 - refine CASTNET-derived profile data
 - improve agent prompt/schema and fallback logic
 - keep recommendations tied to structured scene state
+
+---
+
+## Runtime Contract
+
+The frontend does not run the LLM. The backend owns all provider calls.
+
+The frontend may either:
+
+- send sampled frames to backend YOLO, then draw returned boxes
+- or use fixture/browser detections and send only `DynamicContext` JSON
+
+Either way, the backend receives structured scene state and starts async agent analysis.
+
+Primary flow:
+
+```text
+Frontend camera/demo frame
+  -> /scan-frame
+  -> DynamicContext boxes/labels
+  -> /analyze-scene
+  -> job_id
+  -> /analysis/{job_id}
+  -> RecommendationOutput
+```
 
 ---
 

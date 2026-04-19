@@ -333,6 +333,8 @@ The UI displays the latest completed recommendation when available.
 
 ## Core Schemas
 
+See `docs/team-contracts.md` for the team handoff version of these schemas.
+
 ### Fixed Context
 
 ```json

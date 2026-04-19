@@ -40,6 +40,8 @@ class SceneObject(BaseModel):
 
 
 class DynamicContext(BaseModel):
+    """Normalized scene snapshot consumed by agent analysis."""
+
     objects: list[SceneObject]
     source: str = "fixture"
 
