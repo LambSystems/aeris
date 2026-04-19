@@ -1,3 +1,4 @@
+import os
 import time
 
 from app.llm.template import TemplateProvider
@@ -7,9 +8,13 @@ from app.schemas import ActionRecommendation, DynamicContext, FixedContext, Reco
 class OpenAIProvider(TemplateProvider):
     """OpenAI provider placeholder.
 
-    Keep OpenAI as the secondary option behind the same interface. The demo can
-    ship without enabling this class because TemplateProvider remains safe.
+    Kept behind the same interface as a future option. Raises when no API key is
+    set so the agent_decision fallback chain cascades past it cleanly.
     """
+
+    def __init__(self) -> None:
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise RuntimeError("OPENAI_API_KEY is not set")
 
     def generate_recommendations(
         self,
