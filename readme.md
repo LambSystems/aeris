@@ -1,171 +1,42 @@
 # Aeris
 
-**Aeris** is a pollution-aware scene analyzer for outdoor sustainability.
+**Aeris** detects environmental waste in real time and tells people exactly what to do about it.
 
-It uses **CASTNET-based environmental exposure context**, **live YOLO scene perception**, and an **asynchronous agentic reasoning layer** to recommend what outdoor resources should be **protected, moved, covered, or deprioritized first** under pollution-related environmental stress.
+A YOLO camera pipeline spots objects like litter or improperly disposed waste. The backend combines that detection with CASTNET air-quality context, then generates two concise lines of grounded sustainability advice: what the object is and why it matters, then the action the person should take right now.
 
-Instead of stopping at environmental monitoring, Aeris turns environmental context into **real-world action**.
+Shuja's updated product context is the source of truth for this branch:
 
----
-
-## Why Aeris
-
-Environmental data often tells us **that** risk exists, but not **what to do next**.
-
-Aeris closes that gap by combining three layers:
-
-- **Fixed Context**: environmental exposure context derived from CASTNET
-- **Live Perception**: YOLO-based 2D detection of visible outdoor resources
-- **Agentic Decisioning**: asynchronous Gemini/OpenAI reasoning over the latest structured scene snapshot
-
-From there, Aeris updates the **best next actions** for protecting resources without blocking the camera stream.
-
----
-
-## Core Idea
-
-Aeris answers:
-
-> Given this environmental exposure context, and given the actual objects in front of me, what should I protect first?
-
-Example output:
-
-- Protect the seed tray first
-- Move the battery pack into storage
-- Use the tarp if time allows
-- Leave the water jug for later
-
----
-
-## Hackathon Demo Scope
-
-For HackAugie, Aeris is focused on one clear use case:
-
-### Outdoor resource protection under environmental stress
-
-The demo scene contains a small outdoor or semi-outdoor setup such as:
-
-- seed tray
-- battery pack
-- metal tool
-- tarp
-- storage bin
-- water jug
-- gloves
-- one irrelevant object
-
-Aeris uses environmental context plus live scene perception to trigger an asynchronous recommendation about what should be protected first.
+```text
+YOLO detection -> CASTNET context -> sustainability advice
+```
 
 ---
 
 ## How It Works
 
-### 1. Fixed Context
-
-Aeris loads environmental exposure context for the location.
-
-This includes:
-
-- CASTNET-informed pollution profile
-- pollution stress mode
-- risk summary for outdoor assets
-
-### 2. Live Perception
-
-Aeris keeps the scene/camera view responsive while YOLO detects visible resources in 2D.
-
-The YOLO adapter returns a structured scene snapshot with:
-
-- object names
-- confidence
-- bounding boxes
-- approximate distance / reachability
-
-### 3. Agentic Decision Layer
-
-Aeris starts an asynchronous reasoning job over:
-
-- CASTNET context
-- detected objects
-- approximate distance / reachability
-- allowed protection actions
-
-Gemini is the primary provider, OpenAI is the fallback, and local template/fallback policy output keeps the demo stable if providers fail.
-
----
-
-## Why This Fits Sustainability
-
-Aeris is a sustainability project because it focuses on:
-
-- protecting outdoor resources from pollution-related stress
-- reducing avoidable degradation
-- extending the useful life of materials and equipment
-- reducing unnecessary replacement and waste
-- turning environmental monitoring into practical environmental adaptation
-
----
-
-## Tech Stack
-
-### Frontend
-
-- Lovable first UI pass
-- React / Vite / TypeScript / Tailwind
-- live camera view
-- 2D detection overlay
-- async recommendation panel
-
-### Backend
-
-- FastAPI service for context, scan snapshots, async analysis jobs, and latest recommendations
-- Gemini/OpenAI provider wrappers
-- fixture and fallback policy safety paths
-- schema-based orchestration
-
-### Computer Vision
-
-- **YOLO** for primary object detection
-- simple bounding-box heuristics for approximate reachability / distance
-- **Boxer optional** only if it becomes stable without slowing the demo
-
-### Data
-
-- CASTNET-derived environmental context
-- processed lookup/profile data for demo use
-
-### Agent
-
-- Gemini-first agentic decision layer
-- OpenAI fallback
-- local template/fallback policy safety net
-
----
-
-## MVP+
-
-### Must-have
-
-- CASTNET-based fixed context
-- live or fixture-backed YOLO detections
-- async agentic recommendations
-- clean UI with visible analysis state
-
-### Nice-to-have
-
-- rescan after objects move
-- missing protection insight
-- two environmental modes
-- small 3D scene map
-
----
-
-## Team
-
-- **Chau** - Frontend
-- **Gallo** - Data / Computer Vision
-- **Shuja** - Agentic / Data / Policy Logic
-- **Piero** - Backend / API
+```text
+Camera feed
+    |
+    v
+YOLO Pipeline          <- Gallo
+    |  object_class, confidence, bbox
+    v
+POST /sustainability/detect    <- FastAPI backend
+    |
+    +-- Loads CASTNET air-quality context
+    |   ozone, sulfate, nitrate, CO
+    |
+    +-- Calls adviser layer
+        Claude primary, deterministic fallback coming
+            |
+            v
+        Two-line response:
+        - context: what it is, what it is made of, why it is a problem
+        - action: exactly what to do right now
+            |
+            v
+    Frontend UI          <- Chau
+```
 
 ---
 
@@ -173,18 +44,19 @@ Aeris is a sustainability project because it focuses on:
 
 ```text
 aeris/
-|-- README.md
-|-- docs/
-|   |-- product.md
-|   |-- architecture.md
-|   |-- mvp.md
-|   |-- data.md
-|   |-- demo.md
-|   |-- stack.md
-|   `-- interface-concept.md
-|-- frontend/
-|-- backend/
-`-- data/
+  readme.md
+  backend/
+    app/
+      main.py
+      schemas.py
+      sustainability/
+        schemas.py
+        castnet_mock.py
+        adviser.py
+    streamlit_app.py
+  frontend/
+  data/
+  docs/
 ```
 
 ---
@@ -201,16 +73,37 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Backend:
+The API runs at:
 
 ```text
 http://localhost:8000
 ```
 
-API docs:
+Interactive docs:
 
 ```text
 http://localhost:8000/docs
+```
+
+Optional `.env` in `backend/`:
+
+```text
+ANTHROPIC_API_KEY=your_key_here
+GEMINI_API_KEY=your_key_here
+OPENAI_API_KEY=your_key_here
+```
+
+### Streamlit Dev UI
+
+```bash
+cd backend
+streamlit run streamlit_app.py
+```
+
+The Streamlit app runs at:
+
+```text
+http://localhost:8501
 ```
 
 ### Frontend
@@ -221,89 +114,97 @@ npm install
 npm run dev
 ```
 
-Frontend:
+The frontend runs at:
 
 ```text
 http://localhost:5173
 ```
 
-The frontend falls back to mock data if the backend is not running.
-
 ---
 
-## Build Priorities
+## Main API Contract
 
-See [docs/team-contracts.md](docs/team-contracts.md) for exact inputs and outputs between team members.
+### `POST /sustainability/detect`
 
-### Piero / Backend
+This is the primary endpoint for the updated product.
 
-- keep the FastAPI contract stable
-- wire YOLO output into `backend/app/cv/yolo_service.py`
-- keep fixture fallback working
-- keep async analysis jobs stable
-- keep fallback policy available only as a safety net
+YOLO or the frontend should call this only when a detection is stable and confidence is at least `0.90`.
 
-### Chau / Frontend
+Request:
 
-- use `docs/interface-concept.md` as the source of truth
-- Lovable can generate the first UI pass
-- keep the app as a single demo screen
-- keep livestream smooth while analysis jobs run
-- poll latest recommendation instead of blocking UI on LLM response
-
-### Gallo / CV
-
-- prioritize YOLO over Boxer
-- output the normalized scene schema used by the backend
-- do not block the demo if live CV is unstable
-
-### Shuja / Data + Agent
-
-- refine CASTNET-derived profile data
-- improve agent prompt/schema and fallback logic
-- keep recommendations tied to structured scene state
-
----
-
-## Runtime Contract
-
-The frontend does not run the LLM. The backend owns all provider calls.
-
-The frontend may either:
-
-- send sampled frames to backend YOLO, then draw returned boxes
-- or use fixture/browser detections and send only `DynamicContext` JSON
-
-Either way, the backend receives structured scene state and starts async agent analysis.
-
-Primary flow:
-
-```text
-Frontend camera/demo frame
-  -> /scan-frame
-  -> DynamicContext boxes/labels
-  -> /analyze-scene
-  -> job_id
-  -> /analysis/{job_id}
-  -> RecommendationOutput
+```json
+{
+  "detection": {
+    "object_class": "soda_can",
+    "confidence": 0.94,
+    "frame_id": "frame_042",
+    "timestamp": "2026-04-18T10:30:00Z",
+    "bbox": { "x": 120, "y": 340, "width": 80, "height": 60 }
+  }
+}
 ```
 
+Response:
+
+```json
+{
+  "object_detected": "soda_can",
+  "confidence": 0.94,
+  "context": "A soda can was detected. Aluminum persists for decades if littered, and elevated ozone can add outdoor material stress.",
+  "action": "Place it in the nearest recycling bin that accepts aluminum cans."
+}
+```
+
+The response may take 1-2 seconds when an LLM provider is used, so the UI should show a loading state and keep the camera/detection view responsive.
+
 ---
 
-## Status
+## Build Priorities By Role
 
-HackAugie MVP+ in progress.
+### Gallo - Computer Vision
 
-Current goal:
+- YOLO detects objects in the camera feed.
+- When confidence is at least 90%, call `POST /sustainability/detect`.
+- Expected object classes include `soda_can`, `plastic_bottle`, `cardboard_box`, `cigarette_butt`, `plastic_bag`, `food_wrapper`, `glass_bottle`, and `styrofoam_cup`.
+- The detection schema lives in `backend/app/sustainability/schemas.py`.
 
-- deliver one polished end-to-end demo
-- show CASTNET-based context
-- show live scene perception
-- show async agentic protection decisions
-- tell a clear sustainability story
+### Chau - Frontend
+
+- On detection trigger, show loading state.
+- On response, display `context` as the environmental concern and `action` as the call to action.
+- Backend base URL is `http://localhost:8000`.
+- Use `http://localhost:8000/docs` for API docs.
+- Streamlit at `http://localhost:8501` can be used as a reference output.
+
+### Piero - Backend
+
+- Keep `POST /sustainability/detect` stable.
+- Process CASTNET data with `scripts/process_castnet.py`.
+- Load `data/castnet/processed/current_reading.json` in the sustainability endpoint.
+- Keep deterministic fallback advice so the demo does not depend fully on an LLM key/network.
+- Keep older demo endpoints available only as compatibility helpers.
+
+### Shuja - Data / Agent
+
+- Product context, prompt direction, and sustainability framing are source of truth.
+- Prompt and LLM logic live in `backend/app/sustainability/adviser.py`.
+- CASTNET reading shape lives in `backend/app/sustainability/schemas.py`.
+
+---
+
+## Tech Stack
+
+| Layer | Tech |
+|---|---|
+| Computer Vision | YOLO |
+| Backend | FastAPI, Python, Pydantic |
+| LLM | Claude primary for sustainability advice; Gemini/OpenAI compatibility remains |
+| Environmental Data | CASTNET |
+| Frontend | React, Vite, TypeScript, Tailwind |
+| Dev UI | Streamlit |
 
 ---
 
 ## One-Line Pitch
 
-**Aeris uses CASTNET environmental exposure data, live YOLO scene perception, and asynchronous agentic reasoning to tell users what outdoor resources to protect first under pollution-related stress.**
+**Aeris uses YOLO object detection and CASTNET air-quality data to give people two-line, grounded sustainability advice the moment they encounter waste.**

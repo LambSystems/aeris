@@ -1,38 +1,38 @@
-import time
+import os
 
+from google import genai
+from google.genai import types
+
+from app.llm.prompt import SYSTEM_PROMPT, build_user_prompt, parse_recommendation_json
 from app.llm.template import TemplateProvider
-from app.schemas import ActionRecommendation, DynamicContext, FixedContext, RecommendationOutput
+from app.schemas import DynamicContext, FixedContext, RecommendationOutput
+
+
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 class GeminiProvider(TemplateProvider):
-    """Gemini-first agent provider placeholder.
+    """Gemini-backed adviser. Calls the real SDK and parses structured JSON."""
 
-    Wire the Gemini SDK here. The current scaffold sleeps briefly and uses the
-    fallback output shape so the async job lifecycle can be tested immediately.
-    """
+    def __init__(self, model: str | None = None) -> None:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY is not set")
+        self._client = genai.Client(api_key=api_key)
+        self._model = model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
 
     def generate_recommendations(
         self,
         fixed_context: FixedContext,
         dynamic_context: DynamicContext,
     ) -> RecommendationOutput:
-        time.sleep(1.2)
-        output = super().generate_recommendations(fixed_context, dynamic_context)
-        return output.model_copy(
-            update={
-                "decision_source": "agentic_gemini",
-                "explanation": (
-                    f"{output.explanation} This recommendation was produced through the Gemini agent path."
-                ),
-            }
+        response = self._client.models.generate_content(
+            model=self._model,
+            contents=build_user_prompt(fixed_context, dynamic_context),
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                response_mime_type="application/json",
+                temperature=0.3,
+            ),
         )
-
-    def generate_explanation(
-        self,
-        fixed_context: FixedContext,
-        actions: list[ActionRecommendation],
-        missing_insights: list[str],
-    ) -> str:
-        time.sleep(1.2)
-        base = super().generate_explanation(fixed_context, actions, missing_insights)
-        return f"{base} This explanation was polished by the Gemini provider path."
+        return parse_recommendation_json(response.text or "", decision_source="agentic_gemini")

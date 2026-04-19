@@ -1,4 +1,5 @@
 from app.fallback_policy import build_fallback_recommendations
+from app.llm.anthropic_provider import AnthropicProvider
 from app.llm.gemini import GeminiProvider
 from app.llm.openai_provider import OpenAIProvider
 from app.llm.template import TemplateProvider
@@ -12,26 +13,33 @@ def generate_agentic_recommendations(
 ) -> RecommendationOutput:
     """Generate the async decision output.
 
-    Gemini is the intended primary provider, OpenAI is the fallback provider,
-    and local fallback policy is the final safety net.
+    Tries the requested provider first. If it fails (missing key, network,
+    parse error), falls back through the remaining remote providers and
+    finally to the local fallback policy so the demo always returns a result.
     """
-    try:
-        selected = _select_provider(provider)
-        return selected.generate_recommendations(fixed_context, dynamic_context)
-    except Exception:
-        if provider == "gemini":
-            try:
-                return OpenAIProvider().generate_recommendations(fixed_context, dynamic_context)
-            except Exception:
-                pass
+    for candidate in _fallback_chain(provider):
+        try:
+            return _instantiate(candidate).generate_recommendations(fixed_context, dynamic_context)
+        except Exception:
+            continue
 
-        return build_fallback_recommendations(fixed_context, dynamic_context)
+    return build_fallback_recommendations(fixed_context, dynamic_context)
 
 
-def _select_provider(provider: DecisionProvider) -> TemplateProvider:
+def _fallback_chain(provider: DecisionProvider) -> list[DecisionProvider]:
+    if provider == "template":
+        return ["template"]
+    remote_order: list[DecisionProvider] = ["gemini", "anthropic", "openai"]
+    chain = [provider] + [p for p in remote_order if p != provider]
+    chain.append("template")
+    return chain
+
+
+def _instantiate(provider: DecisionProvider) -> TemplateProvider:
     if provider == "openai":
         return OpenAIProvider()
+    if provider == "anthropic":
+        return AnthropicProvider()
     if provider == "template":
         return TemplateProvider()
     return GeminiProvider()
-

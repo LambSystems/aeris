@@ -7,8 +7,13 @@ RiskLevel = Literal["low", "medium", "high"]
 RiskMode = Literal["protect_plants_and_sensitive_equipment", "general_outdoor_protection"]
 ActionType = Literal["protect_first", "move_to_storage", "cover_if_time_allows", "low_priority"]
 AnalysisStatus = Literal["pending", "complete", "failed"]
-DecisionProvider = Literal["gemini", "openai", "template"]
-DecisionSource = Literal["agentic_gemini", "agentic_openai", "fallback_policy"]
+DecisionProvider = Literal["gemini", "openai", "anthropic", "template"]
+DecisionSource = Literal[
+    "agentic_gemini",
+    "agentic_openai",
+    "agentic_anthropic",
+    "fallback_policy",
+]
 
 
 class PollutionProfile(BaseModel):

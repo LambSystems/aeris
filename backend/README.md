@@ -1,146 +1,165 @@
 # Aeris Backend
 
-FastAPI service for the Aeris hackathon demo.
+FastAPI + Streamlit service that accepts object detections from YOLO, combines them with CASTNET air-quality context, and returns concise sustainability advice.
 
-## Run
+Shuja's updated context is the source of truth: the main product path is waste/object detection advice through `POST /sustainability/detect`.
+
+---
+
+## Setup
 
 ```bash
 cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+Optional `.env` in `backend/`:
+
+```text
+ANTHROPIC_API_KEY=your_key_here
+GEMINI_API_KEY=your_key_here
+OPENAI_API_KEY=your_key_here
+```
+
+---
+
+## Running
+
+API server:
+
+```bash
 uvicorn app.main:app --reload
 ```
 
-The API runs at:
+Runs at:
 
 ```text
 http://localhost:8000
 ```
 
-Swagger docs:
+Interactive docs:
 
 ```text
 http://localhost:8000/docs
 ```
 
-## Core Endpoints
-
-```text
-GET  /health
-GET  /context/demo
-POST /scan-frame
-POST /analyze-scene
-GET  /analysis/latest
-GET  /analysis/{job_id}
-```
-
-Compatibility/demo endpoints:
-
-```text
-GET  /scene/demo
-GET  /scene/demo-after-move
-POST /recommend
-POST /demo/run
-POST /scan
-```
-
-`/scan-frame` accepts an optional multipart image field named `file`. If no file is sent, or while YOLO is not wired, it returns fixture detections. Replace `detect_objects()` in `app/cv/yolo_service.py` when YOLO is ready.
-
-`/analyze-scene` is the async agentic decision path. It returns a job id immediately while Gemini/OpenAI/fallback analysis runs in the background.
-
-`/analysis/latest` returns the latest completed recommendation for polling UIs.
-
-`/recommend` and `/demo/run` are compatibility helpers for local testing and fallback demos.
-
-## Backend Input / Output Contract
-
-See `../docs/team-contracts.md` for the full team handoff contract.
-
-Backend receives:
-
-- sampled frame or fixture request for `/scan-frame`
-- `DynamicContext` JSON for `/analyze-scene`
-- optional `provider`: `gemini`, `openai`, or `template`
-
-Backend returns:
-
-- `FixedContext` from `/context/demo`
-- `DynamicContext` from `/scan-frame`
-- `AnalysisJobResponse` from `/analyze-scene`
-- `RecommendationOutput` from `/analysis/{job_id}` when complete
-
-Do not call the agent for every frame. `/scan-frame` should stay fast. `/analyze-scene` should start a background job and return immediately.
-
-## Event Policy
-
-`app/event_policy.py` is the backend gate that decides whether a scene update is worth an async agent call.
-
-Inputs:
-
-- `FixedContext`
-- `DynamicContext`
-- previous `EventState`
-- `environment_mode`: `indoor` or `outdoor`
-
-Outputs:
-
-- `should_analyze`
-- `reason`
-- `advice_key`
-- `cooldown_remaining`
-
-For now this module is intentionally pure and not wired into `main.py`, so it can be merged safely after the YOLO endpoint work lands.
-
-## Smoke Test
-
-With the backend running, from the repo root:
+Streamlit dev UI:
 
 ```bash
-python scripts\smoke_backend.py
+streamlit run streamlit_app.py
 ```
 
-If you are still inside `backend`, run `python ..\scripts\smoke_backend.py`.
-If the API runs somewhere else, set `AERIS_API_URL`.
-
-Expected output includes:
+Runs at:
 
 ```text
-health: True
-scan-frame: yolo_fixture / 7 objects
-recommendation: agentic_gemini -> protect_first seed_tray
+http://localhost:8501
 ```
 
-Policy/fallback checks that do not need the server:
+---
+
+## Main Endpoint
+
+### `POST /sustainability/detect`
+
+This is the endpoint the YOLO pipeline or frontend calls when a detection is stable and confidence is at least `0.90`.
+
+Request:
+
+```json
+{
+  "detection": {
+    "object_class": "soda_can",
+    "confidence": 0.94,
+    "frame_id": "frame_042",
+    "timestamp": "2026-04-18T10:30:00Z",
+    "bbox": { "x": 120, "y": 340, "width": 80, "height": 60 }
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "object_detected": "soda_can",
+  "confidence": 0.94,
+  "context": "A soda can was detected. Aluminum persists for decades if littered, and elevated ozone can add outdoor material stress.",
+  "action": "Place it in the nearest recycling bin that accepts aluminum cans."
+}
+```
+
+`bbox` is optional. All other fields are required.
+
+---
+
+## Sustainability Package
+
+```text
+app/sustainability/
+  schemas.py
+  castnet_mock.py
+  adviser.py
+```
+
+Responsibilities:
+
+- `schemas.py`: `YOLODetection`, `CASTNETReading`, `DetectionRequest`, `SustainabilityAdvice`
+- `castnet_mock.py`: current mock CASTNET reading; replace with processed real CASTNET data
+- `adviser.py`: prompt + provider call + response parsing
+
+Planned backend hardening:
+
+- deterministic CASTNET preprocessing through `scripts/process_castnet.py`
+- deterministic fallback advice when no LLM key/network is available
+- confidence/cooldown event policy for when not to call advice repeatedly
+
+Processed CASTNET output is loaded from:
+
+```text
+data/castnet/processed/current_reading.json
+```
+
+Raw EPA ZIPs should stay local in `data/castnet/raw/` and are ignored by git.
+
+---
+
+## Other Endpoints
+
+These remain from the earlier async scene-analysis version and are useful for compatibility/testing:
+
+| Endpoint | Description |
+|---|---|
+| `GET /health` | Service health check |
+| `GET /context/demo` | Demo fixed context |
+| `POST /scan-frame` | Fixture or uploaded-frame detection stub |
+| `POST /analyze-scene` | Async agentic scene analysis |
+| `GET /analysis/latest` | Latest completed analysis result |
+| `GET /analysis/{job_id}` | Poll a specific analysis job |
+| `POST /demo/run` | Full demo run with fixture data |
+| `POST /recommend` | Direct fallback recommendation |
+
+`/scan-frame` still accepts optional multipart field `file` and returns fixture detections until YOLO is fully wired.
+
+---
+
+## Local Checks
+
+Compile backend:
+
+```bash
+python -m compileall app
+```
+
+From repo root, policy/fallback checks:
 
 ```bash
 python scripts\test_backend_policy.py
 ```
 
-## YOLO Adapter Contract
+With the API running, from repo root:
 
-Replace `app/cv/yolo_service.py` with real YOLO inference when ready, but keep this output shape:
-
-```json
-{
-  "source": "yolo",
-  "frame_width": 960,
-  "frame_height": 540,
-  "objects": [
-    {
-      "name": "seed_tray",
-      "confidence": 0.94,
-      "distance": 1.0,
-      "reachable": true,
-      "bbox": {
-        "x": 92,
-        "y": 112,
-        "width": 190,
-        "height": 126
-      }
-    }
-  ]
-}
+```bash
+python scripts\smoke_backend.py
 ```
-
-Boxes must be in the same coordinate space as the sampled frame.

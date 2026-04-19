@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 .env
+data/castnet/raw/
 
 # Node
 node_modules/
@@ -18,4 +19,3 @@ yarn-debug.log*
 Thumbs.db
 .idea/
 .vscode/
-
