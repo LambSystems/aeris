@@ -19,7 +19,7 @@ checkpoint_volume = modal.Volume.from_name(CHECKPOINT_VOLUME_NAME, create_if_mis
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("libgl1", "libglib2.0-0")
+    .apt_install("libgl1", "libglib2.0-0", "curl")
     .pip_install(
         "numpy==1.26.4",
         "ultralytics==8.3.49",
@@ -27,6 +27,24 @@ image = (
         "pyyaml==6.0.2",
     )
 )
+
+
+def _resolve_latest_coco_export() -> Path:
+    new_dataset_root = Path(__file__).resolve().parents[2] / "new_dataset"
+    if not new_dataset_root.exists():
+        raise RuntimeError(f"Dataset root not found at {new_dataset_root}")
+
+    candidates = sorted(
+        {
+            annotation_path.parent.parent.resolve()
+            for annotation_path in new_dataset_root.rglob("_annotations.coco.json")
+        },
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        raise RuntimeError(f"No COCO export with _annotations.coco.json found under {new_dataset_root}")
+    return candidates[0]
 
 
 @app.function(
@@ -98,8 +116,9 @@ def main(
     from prepare_roboflow_coco_dataset import build_dataset
 
     dataset_root = Path(__file__).resolve().parents[1] / "datasets" / "trash_coco_yolo"
+    source_dir = _resolve_latest_coco_export()
     build_dataset(
-        source_dir=Path(__file__).resolve().parents[2] / "new_dataset" / "My First Project.coco",
+        source_dir=source_dir,
         output_dir=dataset_root,
         train_ratio=0.85,
         seed=42,
@@ -124,6 +143,7 @@ def main(
     print("Training finished.")
     print(json.dumps(result, indent=2))
     print("")
+    print(f"Source dataset: {source_dir}")
     print(f"Dataset volume: {DATASET_VOLUME_NAME}")
     print(f"Checkpoint volume: {CHECKPOINT_VOLUME_NAME}")
     print("To inspect checkpoints later:")
