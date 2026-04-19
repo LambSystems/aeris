@@ -1,0 +1,20 @@
+{
+  "settings_version": "0.0.6",
+  "datasets_dir": "C:\\Users\\webga\\OneDrive\\Documents\\GitHub\\datasets",
+  "weights_dir": "C:\\Users\\webga\\OneDrive\\Documents\\GitHub\\aeris\\weights",
+  "runs_dir": "C:\\Users\\webga\\OneDrive\\Documents\\GitHub\\aeris\\runs",
+  "uuid": "fb884c0d3e24c021e6329e80c961fc97ccc15d4806377d3c421f9b1a13472829",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "hub": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": true,
+  "wandb": false,
+  "vscode_msg": true
+}

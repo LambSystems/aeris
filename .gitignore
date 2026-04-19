@@ -5,6 +5,8 @@ __pycache__/
 venv/
 .env
 config.toml
+backend/datasets/trash_quick/
+backend/.cache/yolo-runs/
 
 # Node
 node_modules/

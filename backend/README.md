@@ -180,3 +180,66 @@ These exist from an earlier version of the project and are still usable for test
 | `GET /analysis/{job_id}` | Poll a specific analysis job |
 | `POST /demo/run` | Full demo run with fixture data |
 | `POST /scan-frame` | Returns mock YOLO scene data |
+
+---
+
+## Quick Trash Training From Root Folders
+
+If you have root-level folders like `paper/`, `can/`, and `bottle/`, build a YOLO dataset with:
+
+```bash
+cd backend
+.venv\Scripts\python.exe scripts\prepare_trash_dataset.py
+```
+
+This creates:
+
+```text
+backend/datasets/trash_quick/
+  images/train
+  images/val
+  labels/train
+  labels/val
+  data.yaml
+```
+
+Important: if an image does not have a same-name `.txt` YOLO label file beside it, the script creates a weak centered box covering most of the frame. That is fast for a hackathon run, but it is only a rough fallback.
+
+## Modal Training
+
+Install Modal locally:
+
+```bash
+cd backend
+.venv\Scripts\activate
+pip install -r requirements-modal.txt
+modal setup
+```
+
+Run the remote fine-tune:
+
+```bash
+cd backend
+modal run scripts/modal_train_yolo.py --epochs 30 --imgsz 640 --batch 16 --patience 8 --run-name trash-quick
+```
+
+The current recommended path uses the annotated COCO export in `new_dataset/My First Project.coco`, converts it to YOLO format, then uploads and trains remotely.
+
+The Modal app:
+
+- builds the YOLO dataset locally from the annotated COCO export
+- uploads it to the `aeris-yolo-trash-dataset` Volume
+- trains `yolov8m.pt` on an `L4`
+- saves checkpoints to the `aeris-yolo-trash-checkpoints` Volume
+
+Inspect saved weights after training:
+
+```bash
+modal volume ls aeris-yolo-trash-checkpoints /runs/trash-quick/weights
+```
+
+Detailed notes for the current custom trash model live in:
+
+```text
+docs/trash-model.md
+```

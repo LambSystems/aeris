@@ -121,6 +121,12 @@ Important YOLOv8n limitations:
 
 For reliable can/trash/bin detection, use a fine-tuned model via `YOLO_MODEL_PATH` and map its raw labels with `YOLO_LABEL_ALIASES_PATH`.
 
+For the current Aeris custom trash model, training notes and expected accuracy are documented in:
+
+```text
+docs/trash-model.md
+```
+
 ## Frontend Usage
 
 Use `scanFrame` from `frontend/src/api.ts`:
