@@ -189,7 +189,6 @@ aeris/
 
 ---
 
-## Quick Start
 
 ### Backend
 
@@ -307,3 +306,11 @@ Current goal:
 ## One-Line Pitch
 
 **Aeris uses CASTNET environmental exposure data, live YOLO scene perception, and asynchronous agentic reasoning to tell users what outdoor resources to protect first under pollution-related stress.**
+
+---
+## Future Roadmap
+- AEIRS will integrate with live data sources and IoT sensors to provide more accurate, real-time environmental insights.
+- AEIRS will scale across multiple platforms, including mobile, web, and wearable devices, broadening its real-world applications.
+- The platform will expand into AR interfaces, overlaying environmental data and risk signals directly onto the user’s real-world view.
+- We explored using Boxer, a newly released spatial computing framework, but chose not to adopt it due to its early-stage maturity and limited ecosystem.
+- Boxer remains a future integration target once the framework stabilizes and becomes suitable for production-level AR/VR deployment.
