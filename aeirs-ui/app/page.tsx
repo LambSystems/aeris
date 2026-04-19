@@ -1,10 +1,8 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
-
-const STREAMLIT_URL =
-  process.env.NEXT_PUBLIC_STREAMLIT_URL ?? "http://127.0.0.1:8507"
 
 export default function Page() {
   const [activeTab, setActiveTab] = useState("home")
@@ -12,10 +10,6 @@ export default function Page() {
   const homeRef = useRef<HTMLDivElement>(null)
   const featuresRef = useRef<HTMLDivElement>(null)
   const impactRef = useRef<HTMLDivElement>(null)
-
-  const openStreamlit = () => {
-    window.location.assign(STREAMLIT_URL)
-  }
 
   useEffect(() => {
     const sections = [
@@ -88,13 +82,13 @@ export default function Page() {
             <h1 className="text-5xl font-bold mb-6">
               Track Your Air. <br /> Shape Safer Spaces.
             </h1>
-            <button
-              type="button"
-              onClick={openStreamlit}
-              className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-full transition-colors"
+            <Link
+              href="/live"
+              prefetch={false}
+              className="inline-block bg-white/10 hover:bg-white/20 px-6 py-3 rounded-full transition-colors"
             >
               Step into AEIRS
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -198,13 +192,13 @@ export default function Page() {
             </div>
 
             <div className="mt-20 flex flex-wrap gap-4">
-              <button
-                type="button"
-                onClick={openStreamlit}
-                className="bg-white text-neutral-900 hover:bg-white/90 px-8 py-3 rounded-full font-medium transition-colors"
+              <Link
+                href="/live"
+                prefetch={false}
+                className="inline-block bg-white text-neutral-900 hover:bg-white/90 px-8 py-3 rounded-full font-medium transition-colors"
               >
                 Open live vision
-              </button>
+              </Link>
             </div>
           </div>
         </div>
