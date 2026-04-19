@@ -2,23 +2,42 @@
 
 ## Overview
 
-Aeris is built around a simple core pipeline:
+Aeris is built around a live-perception plus asynchronous-reasoning pipeline:
 
-**Fixed Context + Dynamic Context -> Policy Engine -> Action Recommendations**
+```text
+Live camera stream
+        |
+        v
+YOLO 2D object detection
+        |
+        v
+Stable scene snapshot
+        |
+        v
+Async agentic decision job
+        |
+        v
+Latest protection recommendation
+```
 
-The system combines environmental exposure context derived from CASTNET with scene understanding from camera input, then produces ranked recommendations for what outdoor resources should be protected first.
+The camera stream should never wait for the LLM. YOLO updates the visible scene state quickly, while Gemini/OpenAI reason asynchronously over the latest structured scene snapshot and CASTNET context.
 
 ---
 
 ## System Goals
 
-The architecture is designed to satisfy five goals:
+The architecture is designed to satisfy six goals:
 
-1. **Use CASTNET as a core input**
-2. **Use scene understanding to analyze real visible resources**
-3. **Rank actions deterministically**
-4. **Use the LLM only for explanation, not core decision-making**
-5. **Stay small enough to ship during the hackathon**
+1. **Keep the phone-style camera stream smooth**
+2. **Use YOLO for 2D object detection**
+3. **Use CASTNET as the environmental context**
+4. **Use an agentic LLM decision layer for ranking and recommendations**
+5. **Keep all LLM output bounded by schemas and allowed actions**
+6. **Preserve fixture/template fallbacks for demo safety**
+
+The key principle:
+
+> Real-time perception and agentic reasoning run at different speeds.
 
 ---
 
@@ -26,21 +45,32 @@ The architecture is designed to satisfy five goals:
 
 ```text
 CASTNET-derived context
-        +
- optional weather/context
-        ↓
-   Fixed Context
-        +
-camera feed → object detection / spatial estimation
-        ↓
-   Dynamic Context
-        ↓
-    Policy Engine
-        ↓
-Ranked Actions + Explanation
-        ↓
-        UI
-````
+        |
+        v
+Fixed Context
+
+Live camera stream
+        |
+        v
+YOLO every N frames / seconds
+        |
+        v
+Dynamic Context snapshot
+        |
+        v
+POST /analyze-scene starts async agent job
+        |
+        v
+Gemini primary / OpenAI fallback / template fallback
+        |
+        v
+Latest Recommendation State
+        |
+        v
+UI updates recommendation panel when complete
+```
+
+The UI can continue rendering the live camera and detection overlays while the agent is still reasoning.
 
 ---
 
@@ -48,100 +78,80 @@ Ranked Actions + Explanation
 
 ### 1. Fixed Context Engine
 
-The Fixed Context Engine is responsible for building a structured environmental exposure profile for the current location or demo setting.
+The Fixed Context Engine loads a structured environmental exposure profile derived from CASTNET.
 
 Its job is to answer:
 
-* what type of environmental stress matters here?
-* how strong is that stress?
-* what kinds of resources are likely to be vulnerable?
+- what environmental stress matters here?
+- how strong is that stress?
+- what resource categories should the agent care about?
 
 ### Inputs
 
-* processed CASTNET-derived data
-* selected demo location / nearest CASTNET site
-* optional weather or condition enrichments if available
+- processed CASTNET-derived data
+- selected demo location / nearest CASTNET site
 
 ### Outputs
 
-* environmental mode
-* risk summary
-* vulnerability emphasis
+- demo location
+- CASTNET profile/site
+- ozone risk
+- deposition risk
+- active risk mode
+- short summary
 
-### Example output
+### Example
 
 ```json
 {
-  "location": "Demo Location",
-  "castnet_site": "Example Site",
+  "location": "Outdoor Garden Demo",
+  "castnet_site": "Demo CASTNET Profile",
   "pollution_profile": {
     "ozone_risk": "high",
     "deposition_risk": "medium"
   },
   "risk_mode": "protect_plants_and_sensitive_equipment",
-  "summary": "Elevated outdoor exposure conditions for plants and sensitive equipment."
+  "summary": "Elevated ozone and environmental exposure conditions for outdoor plants and sensitive equipment."
 }
 ```
 
 ---
 
-### 2. Dynamic Context Engine
+### 2. Live Perception Layer
 
-The Dynamic Context Engine is responsible for analyzing the visible scene and translating it into a structured scene state.
+The live perception layer is responsible for turning a camera frame into a normalized 2D scene snapshot.
 
-Its job is to answer:
+Primary implementation:
 
-* what objects are present?
-* where are they approximately?
-* are they reachable?
-* which ones are exposed?
-* which ones are protection-enabling objects?
-
-### Inputs
-
-* live camera frame or uploaded image
-* object detector output
-* optional spatial heuristics
-
-### Outputs
-
-* normalized object list
-* confidence values
-* rough spatial attributes
-
-### Detection strategy
-
-Primary:
-
-* **YOLO**
-* bounding-box and frame-position heuristics for approximate spatial reasoning
+- **YOLO**
+- 2D bounding boxes
+- confidence scores
+- label normalization
+- lightweight distance / reachability heuristics
 
 Optional stretch:
 
-* **Boxer**, only if it is already stable and does not slow down integration
+- Boxer, only if stable without slowing the demo
 
-### Example output
+The perception layer should run faster than the reasoning layer. It should update labels/boxes without waiting for the LLM.
+
+### Output Shape
 
 ```json
 {
+  "source": "yolo",
   "objects": [
     {
       "name": "seed_tray",
+      "confidence": 0.94,
       "distance": 1.0,
       "reachable": true,
-      "confidence": 0.94
-    },
-    {
-      "name": "battery_pack",
-      "distance": 1.8,
-      "reachable": true,
-      "confidence": 0.89
-    },
-    {
-      "name": "metal_tool",
-      "distance": 2.2,
-      "reachable": true,
-      "confidence": 0.85
+      "bbox": {
+        "x": 92,
+        "y": 112,
+        "width": 190,
+        "height": 126
+      }
     }
   ]
 }
@@ -149,204 +159,175 @@ Optional stretch:
 
 ---
 
-### 3. Policy Engine
+### 3. Scene State Builder
 
-The Policy Engine is the core decision layer.
+The Scene State Builder converts noisy detections into the snapshot used for reasoning.
 
-It consumes Fixed Context and Dynamic Context, then ranks actions such as:
+It should:
 
-* protect first
-* move next
-* cover if time allows
-* low priority
+- normalize labels into the fixed object taxonomy
+- filter low-confidence detections
+- estimate rough distance/reachability
+- decide when the scene has changed meaningfully
+- avoid triggering agent calls for every video frame
 
-This component must be **deterministic** and should not depend on open-ended LLM reasoning.
+Recommended trigger rules:
 
-### Why deterministic
+- user taps **Analyze**
+- object set changes meaningfully
+- detection state stays stable across 2-3 YOLO snapshots
+- at least 5-10 seconds have passed since the last reasoning job
 
-For the hackathon demo, the project is stronger if the reasoning path is inspectable and grounded in explicit logic.
+This prevents the LLM from being called too often.
 
-That makes the output:
+---
 
-* easier to debug
-* easier to explain
-* easier to trust
-* more stable under demo pressure
+### 4. Agentic Decision Layer
 
-### Core scoring logic
+The Agentic Decision Layer is the main recommendation engine.
 
-The engine should combine factors such as:
+It consumes:
 
-* environmental vulnerability of object type
-* value of protecting the object
-* distance or reachability cost
-* urgency implied by current mode
-* whether an item enables protection of others
+- Fixed Context from CASTNET
+- Dynamic Context from YOLO
+- allowed object names
+- allowed action vocabulary
+- output schema
 
-### Example conceptual scoring
+It returns:
 
-```text
-priority_score =
-  vulnerability_weight(object_type, risk_mode)
-  + protection_value_weight(object_type)
-  + enabling_weight(object_type)
-  - distance_cost
-  - handling_cost
+- ranked actions
+- target objects
+- concise reasons
+- explanation text
+
+Primary provider:
+
+- Gemini
+
+Secondary provider:
+
+- OpenAI
+
+Fallback:
+
+- template/fallback policy output
+
+The LLM should make ranking decisions from structured scene state, not raw video.
+
+### Bounded Output Schema
+
+```json
+{
+  "actions": [
+    {
+      "rank": 1,
+      "action": "protect_first",
+      "target": "seed_tray",
+      "reason": "Plant-sensitive resource under elevated ozone exposure."
+    }
+  ],
+  "explanation": "Aeris recommends protecting the seed tray first because CASTNET-derived context indicates elevated plant-sensitive exposure."
+}
 ```
 
-### Example policy intuition
+Allowed actions:
 
-In `protect_plants_and_sensitive_equipment` mode:
+- `protect_first`
+- `move_to_storage`
+- `cover_if_time_allows`
+- `low_priority`
 
-* seed tray: very high priority
-* battery pack: high priority
-* tarp: high priority if it can protect multiple assets
-* storage bin: high priority if it enables coverage/storage
-* metal tools: medium priority
-* water jug: lower priority
-* irrelevant object: very low priority
+Allowed targets:
 
----
-
-### 4. Explanation Layer
-
-The Explanation Layer converts structured recommendations into natural language.
-
-This layer is where the LLM is used.
-
-Its role is limited to:
-
-* explaining ranked actions
-* generating clean recommendation text
-* optionally answering small follow-up questions
-
-The LLM should **not** decide the ranking itself.
-
-### Input to the LLM
-
-* fixed context summary
-* dynamic context summary
-* policy engine output
-
-### Output from the LLM
-
-* short recommendation paragraph
-* human-readable rationale
-
-### Example explanation
-
-> Current environmental conditions increase exposure risk for sensitive outdoor resources. Protect the seed tray first, then move the battery pack into storage. Cover the metal tools if time allows.
+- only objects detected in the current scene snapshot
 
 ---
 
-### 5. Frontend
+### 5. Fallback Policy Layer
 
-The Frontend is a single-screen interface optimized for immediate judge comprehension.
+The fallback policy is not the main product story.
 
-Its job is to make the following visible at a glance:
+Its job is to keep the demo alive if:
 
-* environmental context
-* camera scene
-* detected objects
-* ranked actions
-* explanation
+- Gemini is slow or unavailable
+- OpenAI is unavailable
+- network access fails
+- the agent returns invalid JSON
 
-### Recommended layout
+The fallback policy may use simple local scoring and template explanations, but the UI/pitch should frame it as a safety fallback, not the core decision engine.
+
+---
+
+### 6. Frontend
+
+The frontend should behave like a phone-style live scene analyzer:
+
+- camera stream remains live
+- YOLO boxes update independently
+- recommendation panel shows latest completed decision
+- pending agent jobs show a lightweight "reasoning..." state
+- the UI never freezes while the LLM is running
+
+Recommended visible states:
 
 ```text
-[ Camera / scene scan ]   [ Environmental Context ]
-                          [ Top Actions ]
-                          [ Why These Actions ]
+Watching scene...
+Objects detected
+Reasoning over latest scene...
+Recommendation updated
+Using fallback recommendation
 ```
 
-### Core frontend responsibilities
+---
 
-* show input scene
-* render bounding boxes / labels
-* show fixed context card
-* show ranked recommendations
-* support “scan” and optional “rescan”
+### 7. Backend API Layer
+
+The backend owns:
+
+- schemas
+- CASTNET context loading
+- YOLO scan adapter
+- scene snapshot contracts
+- async analysis jobs
+- latest recommendation state
+- provider abstraction
+- fallback behavior
 
 ---
 
-### 6. Backend API Layer
+## API Flow
 
-The Backend API Layer coordinates the application flow.
+### Fast Perception Path
 
-It should expose clean endpoints for:
+```text
+POST /scan-frame
+```
 
-* fixed context retrieval
-* scene scan processing
-* recommendation generation
+Returns the latest normalized YOLO detections quickly.
 
-The backend should own:
+For the hackathon scaffold, this can return fixture detections until YOLO is wired.
 
-* schemas
-* orchestration
-* integration between CV, context, and ranking logic
+### Async Reasoning Path
 
----
+```text
+POST /analyze-scene
+```
 
-## Data Flow
+Starts an asynchronous agentic reasoning job and immediately returns a `job_id`.
 
-### Step 1 — Load Fixed Context
+The camera UI should continue running.
 
-The frontend requests a CASTNET-informed environmental profile from the backend.
+### Polling Path
 
-### Step 2 — Scan Scene
+```text
+GET /analysis/{job_id}
+GET /analysis/latest
+```
 
-The frontend sends a frame or image reference to the backend or CV service.
+Returns pending, complete, or failed state.
 
-### Step 3 — Build Dynamic Context
-
-The CV pipeline detects objects and estimates enough spatial information for prioritization.
-
-### Step 4 — Rank Actions
-
-The backend passes fixed + dynamic context into the policy engine.
-
-### Step 5 — Generate Explanation
-
-The structured ranking is passed to the explanation layer.
-
-### Step 6 — Render Results
-
-The frontend displays recommendations and rationale.
-
----
-
-## Component Responsibilities
-
-### Frontend
-
-* camera UI
-* rendering detections
-* displaying recommendations
-* triggering scan / rescan
-
-### Backend
-
-* endpoint management
-* schema validation
-* service orchestration
-* policy engine execution
-
-### CV Module
-
-* object detection
-* normalization into dynamic context
-* distance/reachability estimation
-
-### Data Module
-
-* CASTNET preprocessing
-* environmental profile lookup
-* location/site mapping
-
-### LLM Module
-
-* explanation only
-* no core ranking logic
+The UI displays the latest completed recommendation when available.
 
 ---
 
@@ -371,14 +352,31 @@ The frontend displays recommendations and rationale.
 
 ```json
 {
+  "source": "yolo|fixture",
   "objects": [
     {
       "name": "string",
+      "confidence": 0.0,
       "distance": 0.0,
       "reachable": true,
-      "confidence": 0.0
+      "bbox": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
     }
   ]
+}
+```
+
+### Analysis Job
+
+```json
+{
+  "job_id": "string",
+  "status": "pending|complete|failed",
+  "recommendations": null
 }
 ```
 
@@ -386,18 +384,15 @@ The frontend displays recommendations and rationale.
 
 ```json
 {
+  "decision_source": "agentic_gemini|agentic_openai|fallback_policy",
   "actions": [
     {
       "rank": 1,
-      "action": "protect",
+      "action": "protect_first",
       "target": "seed_tray",
-      "reason_tags": ["high_vulnerability", "high_priority", "reachable"]
-    },
-    {
-      "rank": 2,
-      "action": "move_to_storage",
-      "target": "battery_pack",
-      "reason_tags": ["sensitive_equipment", "moderate_distance"]
+      "score": null,
+      "reason_tags": ["plant_sensitive", "high_ozone_context"],
+      "reason": "Plant-sensitive resource under elevated ozone exposure."
     }
   ],
   "explanation": "string"
@@ -406,88 +401,44 @@ The frontend displays recommendations and rationale.
 
 ---
 
-## Detection and Spatial Reasoning Strategy
-
-### Primary path: YOLO
-
-YOLO is the primary path because it is faster to integrate, easier to test, and more reliable under hackathon time pressure.
-
-Use YOLO to detect the small fixed object taxonomy, then add approximate spatial reasoning with:
-
-* bounding-box size
-* frame position
-* scene heuristics
-* optional lightweight depth cues if easy
-
-### Important principle
-
-Aeris does **not** require perfect 3D reconstruction.
-
-It requires enough spatial information to support practical prioritization.
-
-### Optional path: Boxer
-
-Boxer can remain a stretch option if it becomes stable quickly, but it should not block the demo. The system contract should stay the same regardless of whether detections come from YOLO, Boxer, or a fixture.
-
----
-
-## Architectural Constraints
-
-To keep the project buildable within the hackathon:
-
-* one scene only
-* one core domain only
-* small object taxonomy
-* deterministic recommendation logic
-* no complex forecasting pipeline
-* no open-ended autonomous agent loop
-* no large environmental simulation layer
-
-This is an MVP+ architecture, not a full production system.
-
----
-
 ## Failure and Fallback Design
-
-### If CASTNET processing is too heavy
-
-Fallback to a preprocessed small environmental profile lookup table derived from CASTNET for the demo location(s).
 
 ### If YOLO is unstable
 
-Fallback immediately to pre-captured demo-frame detections while keeping the same recommendation pipeline.
+Use fixture detections from a pre-captured demo frame.
 
 ### If live camera is unstable
 
-Allow image upload or fixed demo frames while keeping the same recommendation pipeline.
+Use a pre-captured demo image while preserving the same scene snapshot schema.
 
-### If LLM explanation becomes brittle
+### If Gemini is slow
 
-Use template-based explanations generated from policy tags.
+Keep the latest completed recommendation visible and show a pending reasoning state.
 
-The demo must remain stable even if advanced components fail.
+### If Gemini fails
+
+Try OpenAI.
+
+### If all LLM providers fail
+
+Use fallback policy/template output.
+
+### If no recommendation is ready
+
+Show detections and a "reasoning over latest scene" state.
 
 ---
 
 ## Why This Architecture Works
 
-This architecture is strong because it separates the system into interpretable layers:
+This architecture resolves the core hackathon contradiction:
 
-* **Fixed Context** tells us what kind of environmental stress matters
-* **Dynamic Context** tells us what resources are actually present
-* **Policy Engine** decides what action matters most
-* **LLM** makes the output readable
+- live camera and YOLO perception need to feel real-time
+- LLM reasoning will be slower and should be asynchronous
+- the UI should never block on reasoning
+- agentic decision-making remains the main story
+- fallback logic keeps the demo stable
 
-That separation makes Aeris:
+One-sentence architecture summary:
 
-* easier to build quickly
-* easier to demo
-* easier to defend technically
-* easier to explain to judges
-
----
-
-## One-Sentence Architecture Summary
-
-**Aeris combines CASTNET-derived environmental context with scene understanding and a deterministic policy engine to recommend what outdoor resources should be protected first.**
-
+**Aeris keeps camera perception live with YOLO, then asynchronously uses CASTNET context and an agentic LLM decision layer to recommend what outdoor resources should be protected first.**

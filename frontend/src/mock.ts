@@ -52,6 +52,7 @@ export const mockDemoResponse: DemoRunResponse = {
     ],
   },
   recommendations: {
+    decision_source: "fallback_policy",
     actions: [
       {
         rank: 1,
@@ -83,4 +84,3 @@ export const mockDemoResponse: DemoRunResponse = {
     missing_insights: [],
   },
 };
-

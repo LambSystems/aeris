@@ -1,31 +1,33 @@
 # Product Overview
 
 ## Name
+
 **Aeris**
 
 ## Tagline
-**A pollution-aware scene analyzer that recommends what outdoor resources to protect first.**
+
+**A pollution-aware scene analyzer that watches outdoor resources and recommends what to protect first.**
 
 ---
 
 ## Product Summary
 
-Aeris is a sustainability-focused decision system that combines **environmental exposure context** with **real-time scene understanding** to help users protect outdoor resources under pollution-related stress.
+Aeris is a sustainability-focused decision system that combines **CASTNET environmental exposure context**, **live YOLO scene perception**, and **asynchronous agentic reasoning** to help users protect outdoor resources under pollution-related stress.
 
-It takes two kinds of input:
+It takes two main inputs:
 
 - **Fixed Context**: environmental conditions derived from CASTNET-based pollution exposure data
-- **Dynamic Context**: the real objects currently visible in an outdoor or semi-outdoor setup
+- **Dynamic Context**: visible objects detected from a live or fixture-backed scene
 
-Aeris then recommends what should be **protected, moved, covered, or deprioritized first**.
+An agentic reasoning layer then recommends what should be **protected, moved, covered, or deprioritized first**.
 
-The goal is to turn environmental monitoring into **practical action**.
+The camera/scene view should stay responsive while the agent reasons in the background.
 
 ---
 
 ## Problem
 
-Environmental data often tells institutions that pollution-related risk exists, but it rarely helps ordinary people decide what to do with the real resources in front of them.
+Environmental data often tells institutions that pollution-related risk exists, but it rarely helps people decide what to do with the real resources in front of them.
 
 For small outdoor setups like:
 
@@ -37,44 +39,29 @@ For small outdoor setups like:
 
 there is no practical tool that says:
 
-> given current environmental exposure conditions, what should I protect first?
-
-This creates a last-mile problem between:
-
-- **environmental awareness**
-- and
-- **resource-level action**
-
-As a result, materials, tools, electronics, and plant resources are more likely to remain exposed, degrade faster, and require replacement sooner than necessary.
+> given current environmental exposure conditions and this visible scene, what should I protect first?
 
 ---
 
 ## Solution
 
-Aeris solves this by combining environmental context with scene analysis.
+Aeris solves this by combining live perception with asynchronous reasoning.
 
-### Step 1 — Understand environmental stress
+### Step 1 - Understand Environmental Stress
+
 Aeris uses CASTNET-derived context to understand what kind of pollution exposure matters in the location.
 
-### Step 2 — Understand the real scene
-Aeris scans a visible setup and identifies relevant outdoor resources.
+### Step 2 - Watch The Scene
 
-### Step 3 — Recommend the next best actions
-Aeris ranks what should be protected first based on:
+YOLO detects visible outdoor resources in 2D and produces a structured scene snapshot.
 
-- environmental vulnerability
-- resource type
-- spatial accessibility
-- protection value
-- time-sensitive prioritization
+### Step 3 - Reason Asynchronously
 
-This allows Aeris to move from:
+A Gemini-first agentic decision layer evaluates the latest snapshot and returns ranked protection actions.
 
-> “there is pollution-related risk in this environment”
+### Step 4 - Update The User
 
-to:
-
-> “protect this first, then move this, then cover this if time allows”
+The UI keeps the live scene visible and updates the recommendation panel when reasoning completes.
 
 ---
 
@@ -82,11 +69,10 @@ to:
 
 ### Outdoor Resource Protection
 
-Aeris is designed around a focused hackathon use case:
-
 A user has an outdoor or semi-outdoor setup containing valuable or sensitive resources, and Aeris helps determine what to protect first under pollution-related environmental stress.
 
-### Example objects
+Example objects:
+
 - seed tray
 - battery pack
 - metal hand tool
@@ -95,85 +81,58 @@ A user has an outdoor or semi-outdoor setup containing valuable or sensitive res
 - water jug
 - gloves
 
-### Example output
+Example output:
+
 - Protect the seed tray first
 - Move the battery pack into storage
-- Cover the metal tools if time allows
+- Use the tarp if time allows
 - Leave the water jug for later
 
 ---
 
-## Why This Is a Sustainability Product
+## Why This Is A Sustainability Product
 
-Aeris is directly sustainability-coded because it focuses on:
+Aeris is sustainability-focused because it helps:
 
-- protecting outdoor resources
-- reducing avoidable degradation
-- extending the lifespan of materials and equipment
-- reducing waste from premature replacement
-- improving adaptation to environmental stress
-
-It is not a healthcare app and not a generic productivity assistant.
-
-It is a sustainability tool because it helps users respond to environmental conditions in a way that preserves real-world resources.
+- preserve outdoor resources under environmental stress
+- reduce avoidable degradation
+- extend the useful life of equipment and materials
+- reduce replacement waste
+- improve adaptation to pollution-related exposure
 
 ---
 
 ## Core Product Insight
 
-Aeris is built on a simple but powerful idea:
+> Environmental data should not stop at awareness. It should drive action.
 
-> Environmental risk should not stop at awareness.
-> It should drive action.
-
-Most systems in this space stop at one of two points:
-
-- they show environmental data
-- or they detect objects in a scene
-
-Aeris combines both and adds a decision layer.
-
-That means it does not just answer:
-
-- what is the pollution context?
-- what objects are present?
-
-It answers:
-
-- what matters most in this scene right now?
-- what should the user do first?
+Most environmental tools stop at dashboards or alerts. Most vision tools stop at detection. Aeris combines both and adds an asynchronous decision layer.
 
 ---
 
 ## User Flow
 
-### 1. Load environmental context
-The system loads a CASTNET-informed environmental profile for the demo location.
-
-### 2. Scan the scene
-The user scans a real outdoor or semi-outdoor setup using the camera.
-
-### 3. Build scene state
-Aeris identifies relevant objects and estimates enough spatial information to support prioritization.
-
-### 4. Rank actions
-A policy engine decides what to protect first.
-
-### 5. Explain recommendations
-Aeris presents a short natural-language explanation of the recommended actions.
+1. Load CASTNET context.
+2. Keep scene/camera view active.
+3. Detect visible objects with YOLO.
+4. Start an async agentic analysis job.
+5. Keep the latest recommendation visible while analysis is pending.
+6. Update recommendations when the job completes.
 
 ---
 
 ## Product Inputs
 
 ### Fixed Context Inputs
+
 - CASTNET-derived pollution profile
 - regional exposure mode
 - environmental stress summary
 
 ### Dynamic Context Inputs
-- camera feed
-- object detections
+
+- camera feed or demo frame
+- YOLO detections
 - approximate distance / reachability
 - scene changes over time
 
@@ -184,15 +143,16 @@ Aeris presents a short natural-language explanation of the recommended actions.
 Aeris outputs ranked recommendations such as:
 
 - **Protect first**
-- **Move next**
+- **Move to storage**
 - **Cover if time allows**
 - **Low priority**
 
 Each recommendation should be grounded in:
 
-- the environmental context
-- the visible scene
-- the object’s role and vulnerability
+- environmental context
+- visible scene state
+- the object's role and vulnerability
+- the agentic reasoning output
 
 ---
 
@@ -200,45 +160,19 @@ Each recommendation should be grounded in:
 
 Aeris is not just:
 
-- a dashboard
-- a detector
+- an environmental dashboard
+- an object detector
 - a chatbot
-- an environmental alert viewer
+- a static recommendation list
 
-Its core value is that it converts:
+Its core value is:
 
-**environmental context + scene state -> prioritized real-world action**
-
-That decision layer is the product.
-
----
-
-## Scope for HackAugie
-
-For the hackathon, Aeris is intentionally scoped to:
-
-- one domain: outdoor resource protection
-- one demo scene
-- one environmental context pipeline
-- one recommendation engine
-- one clean UI
-
-This keeps the product understandable, demoable, and technically achievable within the time limit.
-
----
-
-## Success Criteria
-
-The product succeeds if a judge can immediately understand:
-
-1. Aeris uses environmental context grounded in CASTNET
-2. Aeris understands the visible scene
-3. Aeris recommends what should be protected first
-4. The recommendations feel practical and scene-aware
-5. The project clearly preserves resources under environmental stress
+```text
+CASTNET context + live scene perception + async agentic reasoning -> prioritized real-world action
+```
 
 ---
 
 ## One-Sentence Product Definition
 
-**Aeris is a sustainability-focused scene analyzer that uses CASTNET-based pollution exposure context to decide what outdoor resources should be protected first.**
+**Aeris is a sustainability-focused scene analyzer that keeps YOLO perception live while asynchronously using CASTNET context and agentic reasoning to decide what outdoor resources should be protected first.**

@@ -2,44 +2,46 @@
 
 ## Goal
 
-The goal of the Aeris MVP+ is to deliver one polished end-to-end demo that clearly shows:
+The Aeris MVP+ should deliver one polished end-to-end demo that clearly shows:
 
 1. **CASTNET-based environmental context**
-2. **real scene understanding**
-3. **ranked action recommendations**
+2. **live 2D scene perception with YOLO**
+3. **asynchronous agentic recommendations**
 4. **a clear sustainability use case**
 
-The MVP+ is not meant to solve all of environmental adaptation. It is meant to demonstrate a strong, understandable, technically coherent product in a single focused scenario.
+The MVP+ is not a full environmental adaptation platform. It is a focused demo showing that Aeris can watch an outdoor setup, detect resources, and asynchronously recommend what should be protected first.
 
 ---
 
 ## Final MVP Definition
 
-### Aeris MVP+
-Aeris uses a **CASTNET-informed pollution exposure profile** plus **scene understanding** to recommend what outdoor resources should be **protected, moved, covered, or deprioritized first**.
+Aeris uses a **CASTNET-informed pollution exposure profile** plus **YOLO scene perception** to create a structured snapshot of visible outdoor resources. An **agentic reasoning layer** then uses that snapshot to recommend what should be **protected, moved, covered, or deprioritized first**.
 
 For HackAugie, the product is scoped to:
 
 - one domain: outdoor resource protection
 - one demo scene
-- one recommendation engine
-- one primary environmental mode
-- one clean user interface
+- one live or fixture-backed YOLO perception path
+- one asynchronous agentic decision path
+- one clean phone-style interface
 
 ---
 
 ## Demo Use Case
 
-### Use Case
 A user has a small outdoor or semi-outdoor setup containing exposed resources.
 
 Aeris:
-1. loads environmental exposure context
-2. scans the scene
-3. identifies resources
-4. ranks the best next protective actions
 
-### Example scene
+1. loads environmental exposure context
+2. keeps the camera/scene view live
+3. detects visible resources with YOLO
+4. creates a stable scene snapshot
+5. starts an async agentic reasoning job
+6. updates the recommendation when reasoning completes
+
+Example scene:
+
 - seed tray
 - battery pack
 - metal tool
@@ -49,107 +51,111 @@ Aeris:
 - gloves
 - one irrelevant item
 
-### Example output
+Example output:
+
 - Protect the seed tray first
 - Move the battery pack into storage
-- Cover the metal tools if time allows
+- Use the tarp if time allows
 - Leave the water jug for later
 
 ---
 
 ## Must-Have Features
 
-These are required for the MVP+.
-
 ### 1. Fixed Context
+
 The system must load a structured environmental profile derived from CASTNET.
 
-At minimum, this profile should include:
-- demo location
-- CASTNET site or profile identifier
-- pollution stress summary
-- risk mode
+At minimum:
 
-### 2. Scene Understanding
-The system must analyze a real scene and identify relevant resources.
+- demo location
+- CASTNET site/profile identifier
+- ozone risk
+- deposition risk
+- active risk mode
+- short summary
+
+### 2. Live 2D Scene Perception
+
+The system must analyze a scene and identify relevant resources.
+
+Primary:
 
 - YOLO
-- simple bounding-box / frame-position heuristics
-- fixture detections as a fallback if live CV is unstable
+- bounding boxes
+- object labels
+- confidence values
+
+Fallback:
+
+- fixture detections from a backup demo image
 
 The output must produce:
+
 - object names
 - confidence
-- approximate distance or reachability signal
+- approximate distance or reachability
+- optional bounding box
 
-### 3. Deterministic Recommendation Engine
-The system must rank actions in a stable and inspectable way.
+### 3. Async Agentic Recommendation Engine
 
-At minimum, Aeris must output:
-- top ranked action
-- second action
-- optional “if time allows” action
-- short justification
+The main recommendation path should be an LLM-based agentic decision layer.
+
+Primary:
+
+- Gemini
+
+Fallback:
+
+- OpenAI
+- local template/fallback policy if providers fail
+
+The agent must be bounded:
+
+- only rank detected objects
+- only use allowed action types
+- return structured JSON
+- avoid raw video reasoning
 
 ### 4. UI
+
 The demo must show:
+
+- live or simulated camera scene
+- visible detection overlays
 - environmental context card
-- scene scan panel
-- visible detections
-- ranked recommendations
+- current reasoning state
+- latest completed recommendation
 - explanation text
 
 ### 5. Sustainability-Clear Output
-The output must clearly preserve resources under environmental stress.
 
-The recommendations should feel like:
-- real protection actions
-- resource preservation logic
-- environmental adaptation decisions
+The recommendations must clearly preserve resources under environmental stress.
 
 ---
 
 ## MVP+ Extras
 
-These are desirable, but only after core functionality works.
+Only after the core flow works:
 
-### A. Rescan / Update
-If a user moves one item, Aeris updates the recommendations.
-
-### B. Missing Protection Insight
-Example:
-> No tarp detected. Protection options are limited.
-
-### C. Two Protection Modes
-If easy, support:
-
-- `protect_plants_and_sensitive_equipment`
-- `general_outdoor_protection`
-
-### D. Better Explanation Layer
-A slightly richer explanation that references:
-- environmental mode
-- object sensitivity
-- reachability
+- rescan/update after an object moves
+- missing protection insight
+- second environmental mode
+- richer agent explanation
+- small 3D scene map
 
 ---
 
 ## Non-Goals
 
-These are explicitly out of scope.
-
 - full environmental forecasting
-- autonomous long-horizon planning
-- route planning
-- packing/travel logic
-- evacuation logic
-- healthcare workflows
-- many scenes
-- many user types
+- database persistence
+- auth
+- calling the LLM on every video frame
 - full 3D world modeling
 - perfect physical simulation
-- production-ready dataset ingestion pipeline
-- mobile deployment packaging unless trivial
+- production-ready CASTNET ingestion
+- mobile packaging unless trivial
 
 ---
 
@@ -157,45 +163,50 @@ These are explicitly out of scope.
 
 The MVP+ is successful if a judge can immediately see:
 
-### 1. Environmental Data Matters
-The system is clearly driven by environmental context, not just object detection.
-
-### 2. CASTNET Is Present
-The product visibly uses a CASTNET-based environmental profile as part of the decision pipeline.
-
-### 3. Scene Understanding Matters
-The scene scan is not cosmetic. It changes what Aeris recommends.
-
-### 4. The Output Is Actionable
-The system does not just classify or label. It recommends what to do first.
-
-### 5. The Sustainability Story Is Obvious
-Aeris protects resources and reduces avoidable degradation.
+1. CASTNET context is visible and meaningful
+2. YOLO/scene perception identifies real resources
+3. camera/scene UI stays responsive
+4. agentic reasoning updates recommendations asynchronously
+5. recommendations are concrete and sustainability-focused
 
 ---
 
 ## Locked Scope
 
 ### Domain
+
 Outdoor resource protection under pollution-related environmental stress.
 
 ### Objects
-Maximum of **7–8 objects** in the demo scene.
+
+Maximum of 7-8 objects in the demo scene.
 
 ### Context Modes
-Maximum of **2 modes**.
+
+Start with one mode:
+
+- `protect_plants_and_sensitive_equipment`
+
+Optional second mode:
+
+- `general_outdoor_protection`
 
 ### Screens
+
 One screen.
 
 ### Demo Loop
-One simple scan -> recommend -> optional rescan flow.
+
+```text
+live scene -> YOLO detections -> analyze scene -> latest recommendation
+```
 
 ---
 
 ## Core Taxonomy
 
-### Primary objects
+Primary objects:
+
 - `seed_tray`
 - `battery_pack`
 - `metal_tool`
@@ -204,214 +215,119 @@ One simple scan -> recommend -> optional rescan flow.
 - `water_jug`
 - `gloves`
 
-### Optional
+Optional:
+
 - `plant_pot`
 - `electronics_case`
 
-### Low-priority dummy item
+Low-priority dummy:
+
 - `misc_item`
-
-Keep the taxonomy small and stable.
-
----
-
-## Environmental Modes
-
-### Mode 1 — `protect_plants_and_sensitive_equipment`
-Primary mode for the demo.
-
-This mode prioritizes:
-- plant-related resources
-- sensitive electronics
-- protection-enabling objects like tarps and bins
-
-### Mode 2 — `general_outdoor_protection`
-Optional secondary mode if time allows.
-
-This mode uses more general resource-preservation logic.
 
 ---
 
 ## Recommendation Categories
 
-The recommendation engine should output from this small action set:
+The agent should choose from:
 
 - `protect_first`
 - `move_to_storage`
 - `cover_if_time_allows`
 - `low_priority`
 
-Keep the action vocabulary minimal and readable.
-
----
-
-## Minimum Data Requirements
-
-For the hackathon, Aeris does not need a full live environmental modeling pipeline.
-
-It only needs:
-
-- a small processed CASTNET-based profile
-- enough environmental logic to produce a valid mode and summary
-- a visible connection between CASTNET context and recommendations
-
-This can be done through:
-- a preprocessed lookup file
-- a reduced dataset
-- a small number of demo location profiles
-
----
-
-## Minimum CV Requirements
-
-The scene analyzer does not need perfect reconstruction.
-
-It only needs enough signal to support:
-- object identification
-- approximate closeness/reachability
-- visibly grounded recommendations
-
-This means:
-- YOLO is the primary CV path
-- Boxer is optional only if it becomes stable quickly
-- fixture detections are acceptable as a demo safety path
-- approximate spatial reasoning is enough
-
----
-
-## Recommendation Logic Requirements
-
-The recommendation engine must be deterministic.
-
-At minimum, scoring should account for:
-- vulnerability under current environmental mode
-- value of protecting the object
-- distance/reachability penalty
-- enabling value of protection tools like tarps or bins
-
-### Example intuition
-In plant-sensitive mode:
-
-- seed tray should rank very high
-- battery pack should rank high
-- tarp/storage bin should gain value if they enable protection
-- metal tool should rank medium
-- water jug should rank lower
-- irrelevant item should rank near zero
-
----
-
-## Demo Requirements
-
-The final demo must include:
-
-### 1. Environmental Context View
-A visible fixed-context panel showing:
-- location
-- CASTNET profile/site
-- pollution summary
-- active mode
-
-### 2. Scene Scan
-A visible scene containing the demo objects.
-
-### 3. Detection Overlay
-Bounding boxes or labels over visible resources.
-
-### 4. Ranked Action List
-At least top 3 actions.
-
-### 5. Explanation
-A short paragraph explaining why those actions were chosen.
-
-### 6. Sustainability Interpretation
-The recommendations must clearly preserve resources under environmental exposure.
-
----
-
-## Polish Priorities
-
-If core functionality works early, spend the remaining time on:
-
-### Highest-value polish
-- UI readability
-- explanation clarity
-- object detection stability
-- consistent recommendation ranking
-- one strong rescan moment
-
-### Lower-value polish
-- complex animations
-- fancy voice mode
-- multiple pages
-- extra user settings
+Keep action vocabulary minimal and readable.
 
 ---
 
 ## Team Deliverables
 
 ### Chau
-- final app screen
-- camera and UI flow
-- visual hierarchy and polish
+
+- phone-style live scene UI
+- detection overlays
+- current analysis/pending state
+- latest recommendation display
+- Lovable first pass if useful
 
 ### Gallo
-- object detection pipeline
-- YOLO integration
+
+- YOLO detection pipeline
+- label normalization
 - normalized scene output
-- fixture fallback if live detection is unstable
+- fixture fallback
 
 ### Shuja
-- CASTNET simplification
-- fixed-context builder
-- recommendation logic
-- explanation prompt
+
+- CASTNET profile simplification
+- agent prompt/schema
+- fallback policy support
+- explanation quality
 
 ### Piero
-- backend API
+
+- FastAPI backend
+- async analysis job contract
 - schemas
-- orchestration between modules
-- integration and stability
+- provider wrappers
+- latest recommendation state
+- integration stability
 
 ---
 
 ## Build Order
 
 ### Phase 1
-- scaffold repo
-- define schemas
-- define object taxonomy
-- define environmental modes
+
+- backend contracts
+- fixtures
+- context endpoint
+- scan-frame endpoint
+- async analysis job endpoint
 
 ### Phase 2
-- build fixed context
-- build scene analyzer
-- build recommendation logic
+
+- YOLO adapter
+- Gemini/OpenAI provider stubs
+- fallback policy
+- latest recommendation state
 
 ### Phase 3
-- connect backend and frontend
-- render detections and recommendations
+
+- frontend live scene UI
+- detection overlay integration
+- async analysis polling
+- recommendation panel
 
 ### Phase 4
-- improve explanation quality
-- polish UI
-- prepare demo assets
+
+- demo hardening
+- backup frame
+- recorded clip
+- README/setup polish
 
 ---
 
 ## Fallback Rules
 
 ### If YOLO is unstable
-Use fixture detections from a pre-captured demo frame.
+
+Use fixture detections from the backup demo frame.
 
 ### If live camera is unstable
+
 Use uploaded image or pre-captured frame.
 
-### If CASTNET pipeline becomes too heavy
-Use a reduced preprocessed environmental profile file.
+### If Gemini is slow
 
-### If LLM output is unstable
-Use template-generated explanations.
+Keep the latest completed recommendation visible.
+
+### If Gemini fails
+
+Try OpenAI.
+
+### If all LLM providers fail
+
+Use fallback policy/template output.
 
 The system must always prioritize demo stability over technical purity.
 
@@ -419,4 +335,4 @@ The system must always prioritize demo stability over technical purity.
 
 ## One-Sentence MVP+ Definition
 
-**Aeris MVP+ is a CASTNET-driven sustainability demo that scans an outdoor scene and recommends what resources should be protected first under pollution-related environmental stress.**
+**Aeris MVP+ is a CASTNET-driven sustainability demo that keeps scene perception live with YOLO and asynchronously uses an agentic reasoning layer to recommend what outdoor resources should be protected first.**

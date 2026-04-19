@@ -45,9 +45,42 @@ export interface ActionRecommendation {
 }
 
 export interface RecommendationOutput {
+  decision_source: "agentic_gemini" | "agentic_openai" | "fallback_policy";
   actions: ActionRecommendation[];
   explanation: string;
   missing_insights: string[];
+}
+
+export interface AnalyzeSceneRequest {
+  fixed_context?: FixedContext;
+  dynamic_context: DynamicContext;
+  provider?: "gemini" | "openai" | "template";
+}
+
+export interface AnalysisJobResponse {
+  job_id: string;
+  status: "pending" | "complete" | "failed";
+  recommendations?: RecommendationOutput | null;
+  error?: string | null;
+}
+
+export interface LatestAnalysisResponse {
+  has_result: boolean;
+  job?: AnalysisJobResponse | null;
+}
+
+export interface ExplanationRequest {
+  fixed_context: FixedContext;
+  dynamic_context: DynamicContext;
+  actions: ActionRecommendation[];
+  missing_insights: string[];
+  provider?: "gemini" | "openai" | "template";
+}
+
+export interface ExplanationOutput {
+  explanation: string;
+  provider: "gemini" | "openai" | "template";
+  fallback_used: boolean;
 }
 
 export interface DemoRunResponse {
@@ -55,4 +88,3 @@ export interface DemoRunResponse {
   dynamic_context: DynamicContext;
   recommendations: RecommendationOutput;
 }
-

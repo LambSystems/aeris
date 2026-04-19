@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 RiskLevel = Literal["low", "medium", "high"]
 RiskMode = Literal["protect_plants_and_sensitive_equipment", "general_outdoor_protection"]
 ActionType = Literal["protect_first", "move_to_storage", "cover_if_time_allows", "low_priority"]
+AnalysisStatus = Literal["pending", "complete", "failed"]
+DecisionProvider = Literal["gemini", "openai", "template"]
+DecisionSource = Literal["agentic_gemini", "agentic_openai", "fallback_policy"]
 
 
 class PollutionProfile(BaseModel):
@@ -50,15 +53,48 @@ class ActionRecommendation(BaseModel):
     rank: int
     action: ActionType
     target: str
-    score: float
+    score: float | None = None
     reason_tags: list[str]
     reason: str
 
 
 class RecommendationOutput(BaseModel):
+    decision_source: DecisionSource = "fallback_policy"
     actions: list[ActionRecommendation]
     explanation: str
     missing_insights: list[str] = []
+
+
+class AnalyzeSceneRequest(BaseModel):
+    fixed_context: FixedContext | None = None
+    dynamic_context: DynamicContext
+    provider: DecisionProvider = "gemini"
+
+
+class AnalysisJobResponse(BaseModel):
+    job_id: str
+    status: AnalysisStatus
+    recommendations: RecommendationOutput | None = None
+    error: str | None = None
+
+
+class LatestAnalysisResponse(BaseModel):
+    has_result: bool
+    job: AnalysisJobResponse | None = None
+
+
+class ExplanationRequest(BaseModel):
+    fixed_context: FixedContext
+    dynamic_context: DynamicContext
+    actions: list[ActionRecommendation]
+    missing_insights: list[str] = []
+    provider: DecisionProvider = "gemini"
+
+
+class ExplanationOutput(BaseModel):
+    explanation: str
+    provider: DecisionProvider
+    fallback_used: bool = False
 
 
 class DemoRunRequest(BaseModel):
@@ -75,4 +111,3 @@ class DemoRunResponse(BaseModel):
 class HealthResponse(BaseModel):
     ok: bool
     service: str
-

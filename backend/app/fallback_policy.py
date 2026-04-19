@@ -53,7 +53,7 @@ ENABLING_VALUE = {
 }
 
 
-def rank_recommendations(
+def build_fallback_recommendations(
     fixed_context: FixedContext,
     dynamic_context: DynamicContext,
 ) -> RecommendationOutput:
@@ -61,18 +61,19 @@ def rank_recommendations(
         _score_object(index, scene_object, fixed_context)
         for index, scene_object in enumerate(dynamic_context.objects)
     ]
-    actions.sort(key=lambda action: action.score, reverse=True)
+    actions.sort(key=lambda action: action.score or 0, reverse=True)
 
     ranked_actions = [
         action.model_copy(update={"rank": rank})
         for rank, action in enumerate(actions, start=1)
-        if action.score > 0.5
+        if (action.score or 0) > 0.5
     ]
 
     missing_insights = _build_missing_insights(dynamic_context)
     explanation = build_template_explanation(fixed_context, ranked_actions, missing_insights)
 
     return RecommendationOutput(
+        decision_source="fallback_policy",
         actions=ranked_actions,
         explanation=explanation,
         missing_insights=missing_insights,
@@ -149,7 +150,7 @@ def _human_reason(object_name: str, action: ActionType, reason_tags: list[str]) 
     if "plant_sensitive" in reason_tags:
         return "Plant-sensitive resource under elevated ozone context."
     if "sensitive_equipment" in reason_tags:
-        return "Sensitive equipment should be moved out of exposure."
+        return "Sensitive equipment is exposed and should be moved out of environmental stress."
     if "protection_enabler" in reason_tags:
         return "Protection-enabling item can reduce exposure for nearby resources."
     if action == "low_priority":

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Camera, Database, RefreshCcw, ShieldCheck, Sparkles } from "lucide-react";
-import { runDemo } from "./api";
+import { analyzeScene, getAnalysisJob, runDemo } from "./api";
 import type { ActionRecommendation, DemoRunResponse, SceneObject } from "./types/aeris";
 
 const actionLabels: Record<ActionRecommendation["action"], string> = {
@@ -13,6 +13,8 @@ const actionLabels: Record<ActionRecommendation["action"], string> = {
 function App() {
   const [demo, setDemo] = useState<DemoRunResponse | null>(null);
   const [status, setStatus] = useState<"ready" | "scanning" | "complete">("ready");
+  const [analysisStatus, setAnalysisStatus] = useState<"idle" | "reasoning" | "complete" | "failed">("idle");
+  const [decisionSource, setDecisionSource] = useState<string>("fallback_policy");
   const [scene, setScene] = useState<"demo" | "after_move">("demo");
 
   useEffect(() => {
@@ -21,10 +23,52 @@ function App() {
 
   async function loadDemo(nextScene: "demo" | "after_move") {
     setStatus("scanning");
+    setAnalysisStatus("idle");
+    setDecisionSource("fallback_policy");
     const response = await runDemo(nextScene);
     setDemo(response);
     setScene(nextScene);
     setStatus("complete");
+    void startAgentAnalysis(response);
+  }
+
+  async function startAgentAnalysis(response: DemoRunResponse) {
+    setAnalysisStatus("reasoning");
+    try {
+      const job = await analyzeScene({
+        fixed_context: response.fixed_context,
+        dynamic_context: response.dynamic_context,
+        provider: "gemini",
+      });
+
+      const completed = await waitForAnalysis(job.job_id);
+      if (!completed.recommendations) {
+        throw new Error("Analysis completed without recommendations.");
+      }
+
+      setDemo({
+        ...response,
+        recommendations: completed.recommendations,
+      });
+      setDecisionSource(completed.recommendations.decision_source);
+      setAnalysisStatus("complete");
+    } catch (error) {
+      console.warn("Keeping fallback recommendation because async agent analysis failed.", error);
+      setAnalysisStatus("failed");
+      setDecisionSource("fallback_policy");
+    }
+  }
+
+  async function waitForAnalysis(jobId: string) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const job = await getAnalysisJob(jobId);
+      if (job.status === "complete" || job.status === "failed") {
+        return job;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 750));
+    }
+
+    throw new Error("Analysis timed out.");
   }
 
   const topAction = demo?.recommendations.actions[0];
@@ -76,7 +120,12 @@ function App() {
         <aside className="decision-stack">
           <ContextPanel demo={demo} />
           <ActionsPanel actions={demo?.recommendations.actions ?? []} />
-          <ExplanationPanel explanation={demo?.recommendations.explanation} insights={demo?.recommendations.missing_insights ?? []} />
+          <ExplanationPanel
+            explanation={demo?.recommendations.explanation}
+            insights={demo?.recommendations.missing_insights ?? []}
+            status={analysisStatus}
+            provider={decisionSource}
+          />
         </aside>
       </section>
     </main>
@@ -142,8 +191,8 @@ function ActionsPanel({ actions }: { actions: ActionRecommendation[] }) {
     <section className="info-panel actions-panel">
       <div className="panel-heading compact">
         <div>
-          <p className="eyebrow">Policy engine</p>
-          <h2>Top Actions</h2>
+          <p className="eyebrow">Agentic decision</p>
+          <h2>Latest Recommendation</h2>
         </div>
         <ShieldCheck size={20} />
       </div>
@@ -165,15 +214,31 @@ function ActionsPanel({ actions }: { actions: ActionRecommendation[] }) {
   );
 }
 
-function ExplanationPanel({ explanation, insights }: { explanation?: string; insights: string[] }) {
+function ExplanationPanel({
+  explanation,
+  insights,
+  status,
+  provider,
+}: {
+  explanation?: string;
+  insights: string[];
+  status: "idle" | "reasoning" | "complete" | "failed";
+  provider: string;
+}) {
   return (
     <section className="info-panel explanation-panel">
       <div className="panel-heading compact">
         <div>
-          <p className="eyebrow">Why</p>
+          <p className="eyebrow">Agent reasoning</p>
           <h2>Recommendation Rationale</h2>
         </div>
         <Sparkles size={20} />
+      </div>
+      <div className={`explain-state ${status}`}>
+        {status === "reasoning" && "Fallback visible. Agent is reasoning over latest scene..."}
+        {status === "complete" && `Recommendation updated by ${provider}.`}
+        {status === "failed" && "Fallback recommendation shown. Agent path unavailable."}
+        {status === "idle" && "Latest recommendation ready."}
       </div>
       <p>{explanation ?? "Recommendations generated from environmental context and detected objects."}</p>
       {insights.length > 0 && (
@@ -200,4 +265,3 @@ function formatName(value: string) {
 }
 
 export default App;
-

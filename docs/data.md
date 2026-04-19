@@ -10,7 +10,7 @@ In other words:
 
 **CASTNET tells Aeris what matters environmentally.**  
 **Scene understanding tells Aeris what is actually present.**  
-**The policy engine connects the two.**
+**The asynchronous agentic decision layer connects the two.**
 
 ---
 
@@ -109,7 +109,7 @@ This gives you a clear and honest way to say:
 
 * the app uses CASTNET
 * the environmental mode comes from data
-* the policy engine is data-informed
+* the agentic decision layer is data-informed
 
 without spending too much of the hackathon on preprocessing complexity.
 
@@ -282,7 +282,7 @@ The backend combines:
 
 ### 4. Rank actions
 
-The policy engine produces ranked recommendations.
+The agentic decision layer produces ranked recommendations, with fallback policy output available only as a safety net.
 
 This is the core data pipeline.
 

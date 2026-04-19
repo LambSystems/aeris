@@ -20,5 +20,4 @@ high ozone risk -> protect_plants_and_sensitive_equipment
 otherwise       -> general_outdoor_protection
 ```
 
-The processed profile is used by the backend as Fixed Context. The policy engine combines that context with visible scene objects to rank what should be protected first.
-
+The processed profile is used by the backend as Fixed Context. The async agentic decision layer combines that context with visible scene objects to rank what should be protected first. A local fallback policy exists only as a safety net if LLM providers are unavailable.

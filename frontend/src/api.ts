@@ -1,5 +1,11 @@
 import { mockDemoResponse } from "./mock";
-import type { DemoRunResponse } from "./types/aeris";
+import type {
+  AnalysisJobResponse,
+  AnalyzeSceneRequest,
+  DemoRunResponse,
+  DynamicContext,
+  LatestAnalysisResponse,
+} from "./types/aeris";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -38,3 +44,50 @@ export async function runDemo(scene: "demo" | "after_move" = "demo"): Promise<De
   }
 }
 
+export async function scanFrame(): Promise<DynamicContext> {
+  const response = await fetch(`${API_BASE_URL}/scan-frame`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Aeris scan API returned ${response.status}`);
+  }
+
+  return (await response.json()) as DynamicContext;
+}
+
+export async function analyzeScene(request: AnalyzeSceneRequest): Promise<AnalysisJobResponse> {
+  const response = await fetch(`${API_BASE_URL}/analyze-scene`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Aeris analysis API returned ${response.status}`);
+  }
+
+  return (await response.json()) as AnalysisJobResponse;
+}
+
+export async function getAnalysisJob(jobId: string): Promise<AnalysisJobResponse> {
+  const response = await fetch(`${API_BASE_URL}/analysis/${jobId}`);
+
+  if (!response.ok) {
+    throw new Error(`Aeris analysis job API returned ${response.status}`);
+  }
+
+  return (await response.json()) as AnalysisJobResponse;
+}
+
+export async function getLatestAnalysis(): Promise<LatestAnalysisResponse> {
+  const response = await fetch(`${API_BASE_URL}/analysis/latest`);
+
+  if (!response.ok) {
+    throw new Error(`Aeris latest analysis API returned ${response.status}`);
+  }
+
+  return (await response.json()) as LatestAnalysisResponse;
+}

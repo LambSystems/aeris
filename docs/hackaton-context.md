@@ -205,7 +205,7 @@ This is exactly why Aeris is framed around:
 
 - **Fixed Context** = CASTNET-derived environmental exposure profile
 - **Dynamic Context** = scene understanding of real visible resources
-- **Decision Layer** = recommendations about what to protect first
+- **Decision Layer** = asynchronous agentic recommendations about what to protect first
 
 That structure makes the dataset operational.
 
@@ -252,8 +252,8 @@ One scene, one context panel, one recommendation panel
 ### Technical depth
 - CASTNET data processing
 - computer vision
-- policy engine
-- explanation layer
+- asynchronous agentic reasoning
+- fallback policy/template safety path
 
 ### Feasibility
 The system can be built as a focused MVP+ in the remaining time

@@ -351,6 +351,29 @@ h2 {
   margin-top: 8px;
 }
 
+.explain-state {
+  background: rgba(94, 198, 239, 0.1);
+  border: 1px solid rgba(94, 198, 239, 0.22);
+  border-radius: 8px;
+  color: #bfeaff;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+}
+
+.explain-state.complete {
+  background: rgba(213, 245, 109, 0.1);
+  border-color: rgba(213, 245, 109, 0.24);
+  color: #dff89a;
+}
+
+.explain-state.failed {
+  background: rgba(241, 184, 74, 0.1);
+  border-color: rgba(241, 184, 74, 0.24);
+  color: #f1d39b;
+}
+
 .insight {
   align-items: center;
   color: #f1d39b;
@@ -389,4 +412,3 @@ h2 {
     width: 100%;
   }
 }
-
