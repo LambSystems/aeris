@@ -1,0 +1,28 @@
+# Copy to `backend/config.toml` (gitignored).
+# `load_app_env()` loads repo `.env`, then `backend/.env`, then merges this file into the process environment.
+# Use quotes for values that are not plain identifiers. Numbers and booleans are supported.
+
+# --- LLM (optional; fallback advice works without keys) ---
+AERIS_LLM_PROVIDER = "gemini"
+GEMINI_API_KEY = ""
+GEMINI_MODEL = "gemini-2.5-flash"
+ANTHROPIC_API_KEY = ""
+ANTHROPIC_MODEL = "claude-sonnet-4-6"
+OPENAI_API_KEY = ""
+
+# --- FastAPI / CV service ---
+YOLO_MODEL_PATH = ""
+YOLO_CONFIDENCE_THRESHOLD = 0.35
+YOLO_IMAGE_SIZE = 640
+YOLO_INCLUDE_ALL_CLASSES = true
+YOLO_LABEL_ALIASES_PATH = ""
+
+# --- Streamlit live scanner (YOLO_IMGSZ is imgsz for webrtc path) ---
+YOLO_IMGSZ = 256
+YOLO_FRAME_SKIP = 1
+YOLO_DEVICE = ""
+AERIS_ADVICE_COOLDOWN = 10
+AERIS_CAMERA_WIDTH = 480
+AERIS_CAMERA_HEIGHT = 270
+AERIS_CAMERA_FPS = 20
+AERIS_PUBLIC_STREAMLIT_URL = "http://127.0.0.1:8507"

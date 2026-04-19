@@ -80,7 +80,7 @@ export default function Page() {
         <div ref={homeRef} data-section="home" className="h-screen flex items-center px-16 snap-start">
           <div>
             <h1 className="text-5xl font-bold mb-6">
-              Track Your Air. <br /> Shape Safer Spaces.
+              Save Your Environment.
             </h1>
             <Link
               href="/live"
