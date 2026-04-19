@@ -87,4 +87,5 @@ export interface SustainabilityResponse {
   environment_summary: string;
   risk_flags: string[];
   castnet_site?: string;
+  decision_source?: string;
 }

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 interface RecommendationCardProps {
   action: string | null;
   reason?: string | null;
+  source?: string | null;
   loading?: boolean;
   updating?: boolean;
   empty?: boolean;
@@ -12,6 +13,7 @@ interface RecommendationCardProps {
 export function RecommendationCard({
   action,
   reason,
+  source,
   loading,
   updating,
   empty,
@@ -34,6 +36,10 @@ export function RecommendationCard({
           <span className="ml-auto inline-flex items-center gap-1 text-[10.5px] text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
             Updating
+          </span>
+        ) : source ? (
+          <span className="ml-auto rounded-full border border-primary/20 bg-background/80 px-2 py-0.5 text-[10.5px] font-medium text-primary">
+            {formatDecisionSource(source)}
           </span>
         ) : null}
       </div>
@@ -63,4 +69,18 @@ export function RecommendationCard({
       </div>
     </div>
   );
+}
+
+function formatDecisionSource(source: string): string {
+  const cached = source.startsWith("cached_");
+  const base = cached ? source.replace(/^cached_/, "") : source;
+  const label =
+    base === "llm_gemini"
+      ? "Gemini"
+      : base === "llm_anthropic"
+        ? "Claude"
+        : base === "deterministic_fallback"
+          ? "Fallback"
+          : "Policy";
+  return cached ? `Cached ${label}` : label;
 }

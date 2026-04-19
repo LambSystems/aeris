@@ -35,3 +35,4 @@ class SustainabilityAdvice(BaseModel):
     environment_summary: str | None = None
     risk_flags: list[str] = []
     castnet_site: str | None = None
+    decision_source: str = "deterministic_fallback"

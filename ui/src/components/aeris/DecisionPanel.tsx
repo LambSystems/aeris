@@ -92,6 +92,7 @@ export function DecisionPanel({
       <RecommendationCard
         action={recommendation?.action ?? null}
         reason={recommendation?.context ?? null}
+        source={recommendation?.decision_source ?? null}
         loading={recommendationLoading && !recommendation}
         updating={recommendationUpdating}
         empty={!primaryObject && !recommendation}

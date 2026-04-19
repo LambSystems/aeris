@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 
 def load_app_env() -> None:
     backend_root = Path(__file__).resolve().parent.parent
+    repo_root = backend_root.parent
+    load_dotenv(repo_root / ".env")
     load_dotenv(backend_root / ".env")
     config_path = backend_root / "config.toml"
     if not config_path.is_file():
