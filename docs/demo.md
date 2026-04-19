@@ -1,193 +1,219 @@
-# Demo
+# Demo Runbook
 
 ## Demo Goal
 
-The Aeris demo must make five things immediately obvious:
-
-1. Aeris uses CASTNET-based environmental context
-2. Aeris detects real outdoor resources in 2D
-3. The camera/scene view stays live
-4. Agentic reasoning runs asynchronously
-5. The output is a practical sustainability recommendation
-
-The demo should feel like:
-
-> live perception + environmental context -> asynchronous protection decision
-
----
-
-## Demo Summary
-
-Aeris analyzes an outdoor or semi-outdoor setup and recommends what resources should be protected first under pollution-related environmental stress.
-
-The system keeps the visual scene active while a Gemini-first agentic reasoning layer evaluates the latest YOLO scene snapshot.
-
----
-
-## Demo Scene
-
-Use one simple table or workstation with 7-8 objects max:
-
-- seed tray
-- battery pack
-- metal hand tool
-- tarp
-- storage bin
-- water jug
-- gloves
-- one irrelevant item
-
-This gives the agent a mix of sensitive resources, protection enablers, lower-priority resources, and a distractor.
-
----
-
-## Recommended Demo Flow
-
-### Step 1 - Opening
-
-Show the Aeris interface with:
-
-- live scene/camera area
-- CASTNET context panel
-- empty/latest recommendation panel
-
-Say:
-
-> Aeris uses CASTNET-based environmental context and live scene perception to recommend what outdoor resources should be protected first.
-
-### Step 2 - Environmental Context
-
-Show:
-
-- Location: Outdoor Garden Demo
-- CASTNET Profile: Demo CASTNET Profile
-- Ozone Risk: High
-- Deposition Risk: Medium
-- Mode: Protect Plants and Sensitive Equipment
-
-This anchors the dataset immediately.
-
-### Step 3 - Live Scene Perception
-
-Run YOLO or fixture-backed detections.
-
-The scene should show:
-
-- bounding boxes
-- labels
-- confidence values
-
-This is the "Aeris sees the scene" moment.
-
-### Step 4 - Start Agentic Analysis
-
-Trigger analysis from the latest scene snapshot.
-
-The UI should show:
+Make judges understand this in under 30 seconds:
 
 ```text
-Reasoning over latest scene...
+Aeris sees recyclable waste live, uses environmental context, and gives a practical action.
 ```
 
-The camera/scene view should keep running.
+The visual proof is:
 
-### Step 5 - Show Recommendation Update
-
-When the async job completes, update the recommendation panel:
-
-```text
-1. Protect the seed tray first
-2. Move the battery pack into storage
-3. Use the tarp if time allows
-```
-
-This is the core payoff.
-
-### Step 6 - Optional Rescan
-
-Move or remove one item, then trigger another scene snapshot and analysis.
-
-The UI should keep the old recommendation visible while the new one is pending, then replace it when complete.
+- live camera with YOLO box
+- environmental context panel
+- recommendation card that changes from detection + context
 
 ---
 
-## Demo Script
+## Demo Objects
+
+Use only the classes the model is expected to handle well:
+
+```text
+aluminum can
+plastic bottle
+paper / crumpled paper / napkin
+```
+
+Keep the scene simple. One object at a time is better than a cluttered scene.
+
+---
+
+## Run Order
+
+### Terminal 1 - FastAPI
+
+```powershell
+cd C:\Users\akuma\repos\aeris
+conda activate aeris-backend
+$env:PYTHONPATH="backend"
+python -m uvicorn app.main:app --reload --app-dir backend
+```
+
+### Terminal 2 - Streamlit YOLO
+
+```powershell
+cd C:\Users\akuma\repos\aeris\backend
+conda activate aeris-backend
+$env:AERIS_STREAMLIT_EMBED="1"
+$env:YOLO_MODEL_PATH="C:\Users\akuma\repos\aeris\backend\models\trash-quick-v4-best.pt"
+$env:YOLO_DEVICE="0"
+$env:AERIS_CAMERA_WIDTH="960"
+$env:AERIS_CAMERA_HEIGHT="540"
+$env:YOLO_FRAME_SKIP="1"
+$env:YOLO_IMGSZ="320"
+python -m streamlit run streamlit_app.py --server.port 8501
+```
+
+### Terminal 3 - React
+
+```powershell
+cd C:\Users\akuma\repos\aeris\ui
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+---
+
+## Pre-Demo Checklist
+
+1. `http://localhost:8000/health` returns ok.
+2. `http://localhost:5173` loads the Aeris UI.
+3. Browser allows camera access.
+4. Streamlit iframe shows the camera.
+5. YOLO draws a box around can/bottle/paper.
+6. Right sidebar shows fixed context.
+7. Right sidebar changes from "Waiting for detection" to the detected object.
+8. Recommendation card fills in after the first actionable detection.
+
+Manual checks:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:8000/health
+Invoke-RestMethod -Uri "http://localhost:8000/context/fixed?latitude=40.9478&longitude=-90.3712"
+Invoke-RestMethod -Uri http://localhost:8000/vision/latest-detection
+```
+
+---
+
+## Recommended Demo Script
 
 ### Opening
 
-> This is Aeris, a pollution-aware scene analyzer for outdoor sustainability.
+> This is Aeris, a live environmental scanner. It detects recyclable waste and uses local environmental context to tell people what to do right now.
 
-### Context
+### Dataset Moment
 
-> Aeris starts with CASTNET-derived environmental context. In this demo, elevated ozone activates a mode focused on plants and sensitive equipment.
+Point to the environmental context panel.
 
-### Scene Perception
+> The sidebar is not static filler. It is built from CASTNET context plus live weather and air-quality sources. That context affects the recommendation.
 
-> The scene view stays live while YOLO detects exposed outdoor resources in 2D.
+### Vision Moment
 
-### Async Reasoning
+Hold up the can/bottle/paper.
 
-> Aeris sends the latest structured scene snapshot to an agentic reasoning layer. The LLM does not touch raw video, and the camera does not wait for the LLM.
+> The vision model is running live. The box and label come from YOLO, not a pre-baked screenshot.
 
-### Output
+### Advice Moment
 
-> The recommendation updates when reasoning completes: protect the seed tray first, move the battery pack next, and use the tarp if time allows.
+Point to the recommendation.
 
-### Sustainability Close
+> We do not call an LLM every frame. YOLO detects continuously, then an event-based/cached advice layer turns the latest structured detection into a short action.
 
-> Instead of stopping at environmental monitoring, Aeris turns pollution exposure context into practical action that helps preserve outdoor resources and reduce avoidable degradation.
+### Close
 
----
-
-## Visual Requirements
-
-Always keep these visible:
-
-- environmental context
-- scene/camera panel
-- detection overlays
-- analysis state
-- latest ranked recommendation
-- explanation
+> Aeris connects perception, environmental data, and practical sustainability behavior in one live workflow.
 
 ---
 
-## Demo Failure Fallbacks
+## What To Show
 
-### If YOLO fails live
+Best sequence:
 
-Use fixture detections from the backup demo image.
+1. Start with empty/waiting state.
+2. Hold up aluminum can until YOLO detects it.
+3. Let recommendation appear.
+4. Briefly mention CASTNET/weather values.
+5. Swap to bottle or paper if time allows.
 
-### If live camera fails
+Avoid:
 
-Use uploaded image or pre-captured frame.
-
-### If Gemini is slow
-
-Keep showing the live scene and latest completed recommendation.
-
-### If Gemini fails
-
-Try OpenAI.
-
-### If all LLM providers fail
-
-Use fallback policy/template output.
-
-The audience should never feel the system collapsed.
+- cluttered background
+- multiple objects at once
+- moving object too fast
+- discussing browser YOLO unless asked
 
 ---
 
-## What Judges Should Remember
+## If It Feels Slow
 
-- Aeris uses real environmental data
-- Aeris detects real resources
-- Aeris uses agentic reasoning asynchronously
-- Aeris tells users what to protect first
-- Aeris is sustainability through preservation and adaptation
+Restart Streamlit with:
+
+```powershell
+$env:AERIS_CAMERA_WIDTH="640"
+$env:AERIS_CAMERA_HEIGHT="360"
+$env:YOLO_FRAME_SKIP="2"
+$env:YOLO_IMGSZ="320"
+python -m streamlit run streamlit_app.py --server.port 8501
+```
+
+Say, if asked:
+
+> We can tune the vision cadence independently from the UI. The video and advice paths are decoupled.
+
+---
+
+## If Recommendation Does Not Appear
+
+Check latest detection:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:8000/vision/latest-detection
+```
+
+If `null`:
+
+- the model has not passed threshold yet
+- hold object more steadily
+- check Streamlit terminal
+
+If detection exists, test advice:
+
+```powershell
+Invoke-RestMethod `
+  -Uri http://localhost:8000/sustainability/detect `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"latitude":40.9478,"longitude":-90.3712,"detection":{"object_class":"aluminum_can","confidence":0.84,"frame_id":"manual_test","timestamp":"2026-04-19T06:30:00Z"}}'
+```
+
+---
+
+## If GPU Is Not Used
+
+Check:
+
+```powershell
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+```
+
+Expected:
+
+```text
+cuda_available True
+NVIDIA GeForce RTX 5050 Laptop GPU
+```
+
+Streamlit must be restarted after changing PyTorch/GPU setup.
+
+---
+
+## Judge Talking Points
+
+- CASTNET is visibly used in the right panel.
+- Weather and air quality add fixed context.
+- YOLO gives live object perception.
+- The LLM is event-based and cached, not called per frame.
+- The system has deterministic fallback, so it does not collapse if an LLM key/network fails.
 
 ---
 
 ## One-Sentence Demo Summary
 
-**In the Aeris demo, YOLO keeps scene perception live while CASTNET context and an asynchronous agentic reasoning layer recommend what outdoor resources to protect first.**
+**Aeris embeds live YOLO vision in a React interface, then uses FastAPI to combine the latest detection with CASTNET/weather context and produce a practical sustainability recommendation.**

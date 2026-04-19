@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Aeris design system — calm, field-science aesthetic.
+   All colors HSL. Tokens only — never hardcode in components. */
+
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: 40 20% 98%;          /* soft off-white */
+    --foreground: 215 25% 15%;         /* graphite text */
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Primary = recycling green (confirmed action) */
+    --primary: 152 45% 36%;
+    --primary-foreground: 40 20% 98%;
+    --primary-soft: 152 40% 94%;
+
+    /* Secondary = muted environmental blue */
+    --secondary: 205 35% 94%;
+    --secondary-foreground: 210 40% 22%;
+
+    /* Muted slate */
+    --muted: 215 20% 96%;
+    --muted-foreground: 215 15% 45%;
+
+    /* Accent = environmental blue stronger */
+    --accent: 205 55% 42%;
+    --accent-foreground: 0 0% 100%;
+    --accent-soft: 205 50% 95%;
+
+    /* Warm amber for alerts */
+    --warning: 35 85% 50%;
+    --warning-foreground: 35 80% 12%;
+    --warning-soft: 38 90% 95%;
+
+    --destructive: 0 70% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Structure */
+    --border: 215 20% 90%;
+    --input: 215 20% 90%;
+    --ring: 152 45% 36%;
+
+    --radius: 0.75rem;
+
+    /* Detection overlay (bright, but only used on canvas) */
+    --detect-stroke: 152 70% 50%;
+    --detect-fill: 152 70% 50%;
+
+    /* Sidebar (kept) */
+    --sidebar-background: 40 20% 98%;
+    --sidebar-foreground: 215 25% 15%;
+    --sidebar-primary: 152 45% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 20% 96%;
+    --sidebar-accent-foreground: 215 25% 15%;
+    --sidebar-border: 215 20% 90%;
+    --sidebar-ring: 152 45% 36%;
+  }
+
+  .dark {
+    --background: 215 28% 9%;          /* deep charcoal */
+    --foreground: 40 20% 95%;
+
+    --card: 215 25% 12%;
+    --card-foreground: 40 20% 95%;
+
+    --popover: 215 25% 12%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 152 50% 55%;
+    --primary-foreground: 215 28% 9%;
+    --primary-soft: 152 30% 18%;
+
+    --secondary: 215 20% 16%;
+    --secondary-foreground: 40 20% 95%;
+
+    --muted: 215 20% 16%;
+    --muted-foreground: 215 15% 65%;
+
+    --accent: 205 65% 60%;
+    --accent-foreground: 215 28% 9%;
+    --accent-soft: 205 40% 18%;
+
+    --warning: 35 90% 60%;
+    --warning-foreground: 35 80% 12%;
+    --warning-soft: 35 40% 18%;
+
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 20%;
+    --input: 215 20% 20%;
+    --ring: 152 50% 55%;
+
+    --detect-stroke: 152 70% 60%;
+    --detect-fill: 152 70% 60%;
+
+    --sidebar-background: 215 28% 9%;
+    --sidebar-foreground: 40 20% 95%;
+    --sidebar-primary: 152 50% 55%;
+    --sidebar-primary-foreground: 215 28% 9%;
+    --sidebar-accent: 215 20% 16%;
+    --sidebar-accent-foreground: 40 20% 95%;
+    --sidebar-border: 215 20% 20%;
+    --sidebar-ring: 152 50% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  /* subtle scanning shimmer for the camera frame */
+  .scan-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      hsl(var(--primary) / 0.06) 50%,
+      transparent 100%
+    );
+    background-size: 100% 200%;
+    animation: scanShimmer 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes scanShimmer {
+    0%, 100% { background-position: 0% 0%; }
+    50% { background-position: 0% 100%; }
+  }
+}

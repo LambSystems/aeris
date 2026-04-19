@@ -23,6 +23,8 @@ class CASTNETReading(BaseModel):
 
 class DetectionRequest(BaseModel):
     detection: YOLODetection
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class SustainabilityAdvice(BaseModel):
@@ -30,3 +32,7 @@ class SustainabilityAdvice(BaseModel):
     confidence: float
     context: str
     action: str
+    environment_summary: str | None = None
+    risk_flags: list[str] = []
+    castnet_site: str | None = None
+    decision_source: str = "deterministic_fallback"

@@ -5,15 +5,30 @@ __pycache__/
 venv/
 .env
 config.toml
-backend/datasets/trash_quick/
-backend/.cache/yolo-runs/
 
+# Local model and dataset artifacts
+backend/models/*.pt
+backend/models/*.onnx
+backend/datasets/
+backend/training/
+backend/.cache/
 new_dataset/
+paper/
+can/
+bottle/
 
-# Node
+# Local runtime output
+.tmp/
+backend/streamlit*.log
+backend/uvicorn*.log
+data/castnet/raw/
+
+# Node / frontend experiments
 node_modules/
 dist/
 .vite/
+.next/
+*.tsbuildinfo
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
@@ -23,4 +38,3 @@ yarn-debug.log*
 Thumbs.db
 .idea/
 .vscode/
-

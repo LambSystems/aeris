@@ -1,202 +1,136 @@
 # Aeris
 
-**Aeris** detects environmental waste in real time and tells you exactly what to do about it.
+Aeris is a Streamlit-first environmental vision app. It runs a local YOLO model for live waste detection, pairs detections with CASTNET-backed environmental context, and shows immediate sustainability advice beside the video stream.
 
-A YOLO camera pipeline spots objects like litter or improperly disposed waste. That detection is combined with live air quality data from CASTNET, and Claude generates two lines of grounded sustainability advice: what the object is and why it matters, then exactly what the person should do right now.
+Current product direction:
 
----
-
-## How It Works
-
-```
-Camera feed
-    │
-    ▼
-YOLO Pipeline          ← Gallo
-    │  object_class, confidence, bbox
-    │
-    ▼
-POST /sustainability/detect    ← FastAPI backend (Piero / Shuja)
-    │
-    ├── Loads CASTNET air quality data   ← real API coming (Shuja)
-    │   (ozone, sulfate, nitrate, CO)
-    │
-    └── Calls Claude (Anthropic)
-            │
-            ▼
-        Two-line response:
-        • context  — what it is, what it's made of, why it's a problem
-        • action   — exactly what to do right now
-            │
-            ▼
-    Frontend UI          ← Chau
-    (loading → result)
+```text
+Streamlit owns the live camera, detections, and LLM/fallback advice experience.
+FastAPI supports context, testing, and backend integration.
+React is not the primary runtime path.
 ```
 
 ---
 
-## Repo Structure
+## Live Flow
 
+```text
+Camera
+  -> Streamlit WebRTC
+  -> local YOLO model
+  -> realtime boxes and tracked objects
+  -> latest detection written locally
+  -> advice generated with Gemini / Anthropic / deterministic fallback
+  -> answers shown beside the video
 ```
-aeris/
-├── readme.md
-├── backend/
-│   ├── app/
-│   │   ├── main.py                  # FastAPI routes
-│   │   ├── schemas.py               # Shared Pydantic models
-│   │   └── sustainability/
-│   │       ├── schemas.py           # YOLODetection, CASTNETReading, SustainabilityAdvice
-│   │       ├── castnet_mock.py      # Mock CASTNET data — swap for real API
-│   │       └── adviser.py           # Prompt + Claude call + response parsing
-│   └── streamlit_app.py             # Dev UI for testing detections manually
-├── frontend/                        # React / Vite / Tailwind
-├── data/
-└── docs/
+
+Fixed context comes from:
+
+```text
+CASTNET + Open-Meteo weather + Open-Meteo air quality + weather alerts
 ```
 
 ---
 
 ## Quick Start
 
-### Backend
+### 1. Install backend dependencies
 
-```bash
-cd backend
+```powershell
+cd C:\Users\webga\OneDrive\Documents\GitHub\aeris\backend
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create `backend/.env`:
-```
-ANTHROPIC_API_KEY=your_key_here
-```
+### 2. Run FastAPI
 
-Run the API:
-```bash
-uvicorn app.main:app --reload
-# → http://localhost:8000
-# → http://localhost:8000/docs  (interactive API docs)
+```powershell
+cd C:\Users\webga\OneDrive\Documents\GitHub\aeris\backend
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Run the Streamlit dev UI:
-```bash
-streamlit run streamlit_app.py
-# → http://localhost:8501
+### 3. Run Streamlit with the custom YOLO model
+
+```powershell
+cd C:\Users\webga\OneDrive\Documents\GitHub\aeris\backend
+$env:YOLO_MODEL_PATH = (Resolve-Path ".\models\trash-quick-v4-best.pt").Path
+.venv\Scripts\python.exe -m streamlit run streamlit_app.py --server.address 127.0.0.1 --server.port 8507
 ```
 
-### Frontend
+Open:
 
-```bash
-cd frontend
-npm install
-npm run dev
-# → http://localhost:5173
+```text
+FastAPI:   http://127.0.0.1:8000/docs
+Streamlit: http://127.0.0.1:8507
 ```
-
-The frontend falls back to mock data if the backend is not running.
 
 ---
 
-## The Main API Contract
+## What Is Running Where
 
-### `POST /sustainability/detect`
+### Streamlit
 
-This is the single endpoint everything connects to.
+- owns the live camera experience
+- runs the local YOLO checkpoint directly
+- tracks objects across frames
+- shows detections and advice beside the video
+- supports uploaded clip processing
 
-**Request:**
-```json
-{
-  "detection": {
-    "object_class": "soda_can",
-    "confidence": 0.94,
-    "frame_id": "frame_042",
-    "timestamp": "2026-04-18T10:30:00Z",
-    "bbox": { "x": 120, "y": 340, "width": 80, "height": 60 }
-  }
-}
+### FastAPI
+
+- exposes `/context/fixed`
+- exposes `/scan-frame` for uploaded-image scanning
+- exposes `/sustainability/detect`
+- exposes `/vision/latest-detection`
+
+---
+
+## Custom Model
+
+Preferred checkpoint:
+
+```text
+backend/models/trash-quick-v4-best.pt
 ```
 
-**Response:**
-```json
-{
-  "object_detected": "soda_can",
-  "confidence": 0.94,
-  "context": "A soda can was detected — aluminum takes over 80 years to decompose and the elevated ozone levels here accelerate surface oxidation.",
-  "action": "Place it in the nearest blue recycling bin; aluminum cans are accepted at all municipal recycling facilities."
-}
+Current classes:
+
+```text
+can
+paper
+bottle
 ```
 
-Only fire this when YOLO confidence is ≥ 0.90. The call takes ~1–2 seconds (LLM round trip), so the frontend should show a loading state.
-
----
-
-## Build Priorities by Role
-
-### Gallo — Computer Vision
-- YOLO detects objects in the camera feed
-- When confidence ≥ 90%, POST the detection to `/sustainability/detect`
-- Expected object classes include: `soda_can`, `plastic_bottle`, `cardboard_box`, `cigarette_butt`, `plastic_bag`, `food_wrapper`, `glass_bottle`, `styrofoam_cup`
-- The full detection schema is in `backend/app/sustainability/schemas.py`
-
-### Chau — Frontend
-- On detection trigger: show a loading screen
-- On response: display `context` (info/warning style) and `action` (call-to-action style)
-- Backend at `http://localhost:8000` — full API docs at `/docs`
-- Use the Streamlit app at port 8501 as a reference for what the output looks like
-
-### Piero — Backend
-- The core endpoint is `POST /sustainability/detect` in `app/main.py`
-- Keep the FastAPI contract stable — other teammates depend on it
-- The CASTNET mock is in `app/sustainability/castnet_mock.py`; wire the real API there when ready
-
-### Shuja — Data / Agent
-- Real CASTNET API replaces `castnet_mock.py` — match the `CASTNETReading` schema
-- Prompt and LLM logic live in `app/sustainability/adviser.py`
-- Claude model is `claude-sonnet-4-6`, temperature 0.4
-
----
-
-## Tech Stack
-
-| Layer | Tech |
-|---|---|
-| Computer Vision | YOLO |
-| Backend | FastAPI, Python, Pydantic |
-| LLM | Claude (Anthropic) via `claude-sonnet-4-6` |
-| Environmental Data | CASTNET (Clean Air Status and Trends Network) |
-| Frontend | React, Vite, TypeScript, Tailwind |
-| Dev UI | Streamlit |
-
----
-
-## Team
-
-- **Chau** — Frontend
-- **Gallo** — Data / Computer Vision
-- **Shuja** — Agent / Data / LLM
-- **Piero** — Backend / API
-
----
-
-## One-Line Pitch
-
-**Aeris uses YOLO object detection and CASTNET air quality data to give people two-line, grounded sustainability advice the moment they encounter waste.**
-
----
-
-## Custom Model Notes
-
-The full record of the custom trash detector work lives in:
+Full training and annotation notes:
 
 ```text
 docs/trash-model.md
 ```
 
-That includes:
+---
 
-- dataset annotation iterations
-- fine-tuning history
-- preprocessing improvements
-- current model quality
-- Streamlit and runtime integration work
+## Performance Defaults
+
+For smoother live detection:
+
+```powershell
+$env:YOLO_IMGSZ="320"
+$env:YOLO_FRAME_SKIP="2"
+$env:AERIS_CAMERA_WIDTH="640"
+$env:AERIS_CAMERA_HEIGHT="360"
+```
+
+For GPU use:
+
+```powershell
+$env:YOLO_DEVICE="0"
+```
+
+---
+
+## Notes
+
+- YOLO stays local and is prioritized over browser-side inference.
+- LLM-backed advice still runs in the Streamlit experience.
+- The side panel is part of the main Streamlit app now, not an external UI dependency.

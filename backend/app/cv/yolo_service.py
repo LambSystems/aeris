@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import time
 from functools import lru_cache
@@ -8,17 +10,15 @@ from typing import Any
 from app.data import load_scene
 from app.schemas import BoundingBox, DynamicContext, RawDetection, SceneObject
 
+
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 CACHE_ROOT = BACKEND_ROOT / ".cache"
 DEFAULT_CONFIDENCE_THRESHOLD = 0.35
 DEFAULT_IMAGE_SIZE = 640
-DEFAULT_MODEL_PATH = CACHE_ROOT / "yolov8n.pt"
-DEFAULT_INCLUDE_ALL_CLASSES = True
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 FIXTURE_WIDTH = 920
 FIXTURE_HEIGHT = 460
-
 LABEL_ALIASES: dict[str, str] = {}
 
 SUSTAINABILITY_LABELS = {
@@ -26,28 +26,13 @@ SUSTAINABILITY_LABELS = {
     "can",
     "cardboard",
     "cup",
-    "food_wrapper",
-    "glass_container",
     "paper",
-    "plastic_bag",
-    "recycling_bin",
+    "plastic bag",
+    "recycling bin",
     "trash",
-    "trash_bin",
+    "trash bin",
+    "wrapper",
 }
-
-PROTECTION_LABELS = {
-    "battery_pack",
-    "electronics_case",
-    "gloves",
-    "metal_tool",
-    "plant_pot",
-    "seed_tray",
-    "storage_bin",
-    "tarp",
-    "water_jug",
-}
-
-RELEVANT_LABELS = SUSTAINABILITY_LABELS | PROTECTION_LABELS | {"misc_item"}
 
 INDOOR_EVIDENCE_LABELS = {
     "bed",
@@ -85,8 +70,17 @@ OUTDOOR_EVIDENCE_LABELS = {
 }
 
 
+def _candidate_model_paths() -> list[Path]:
+    return [
+        BACKEND_ROOT / "models" / "trash-quick-v4-best.pt",
+        BACKEND_ROOT / "models" / "trash-quick-v3-best.pt",
+        BACKEND_ROOT / "models" / "trash-quick-v2-best.pt",
+        BACKEND_ROOT / "yolov8n.pt",
+        CACHE_ROOT / "yolov8n.pt",
+    ]
+
+
 def scan_demo_frame() -> DynamicContext:
-    """Return the stable fixture-backed scan used when live frame input is absent."""
     return load_scene("demo").model_copy(
         update={
             "source": "yolo_fixture",
@@ -99,14 +93,13 @@ def scan_demo_frame() -> DynamicContext:
 
 
 def yolo_config() -> dict[str, Any]:
-    """Return static adapter settings without loading the YOLO model."""
     return {
         "accepted_content_types": sorted(ALLOWED_CONTENT_TYPES),
         "max_frame_bytes": MAX_FRAME_BYTES,
         "default_confidence_threshold": _default_confidence_threshold(),
         "default_image_size": _default_image_size(),
         "model_name": _model_name(),
-        "include_all_classes": _include_all_classes(),
+        "include_all_classes": True,
         "aeris_labels": _aeris_labels(),
         "label_aliases": _label_aliases(),
     }
@@ -118,12 +111,8 @@ def scan_frame_bytes(
     image_height: int | None = None,
     confidence_threshold: float | None = None,
     image_size: int | None = None,
+    include_raw: bool = True,
 ) -> DynamicContext:
-    """Run YOLO over an uploaded frame and return Aeris-normalized detections.
-
-    Frames are decoded in memory and are not persisted. If the local YOLO model
-    cannot be loaded, Aeris keeps the demo stable by returning the fixture scan.
-    """
     if not image_bytes:
         return scan_demo_frame()
     if len(image_bytes) > MAX_FRAME_BYTES:
@@ -142,6 +131,7 @@ def scan_frame_bytes(
             decoded_height=decoded_height,
             output_width=output_width,
             output_height=output_height,
+            include_raw=include_raw,
         )
         raw_detections = _result_to_raw_detections(
             result=result,
@@ -163,6 +153,24 @@ def scan_frame_bytes(
         )
     except Exception:
         return scan_demo_frame().model_copy(update={"source": "yolo_unavailable_fixture"})
+
+
+def scan_frame_from_bytes(
+    image_bytes: bytes,
+    include_raw: bool = True,
+    confidence_threshold: float | None = None,
+    image_width: int | None = None,
+    image_height: int | None = None,
+    image_size: int | None = None,
+) -> DynamicContext:
+    return scan_frame_bytes(
+        image_bytes=image_bytes,
+        image_width=image_width,
+        image_height=image_height,
+        confidence_threshold=confidence_threshold,
+        image_size=image_size,
+        include_raw=include_raw,
+    )
 
 
 def _decode_image(image_bytes: bytes) -> Any:
@@ -189,14 +197,19 @@ def _run_yolo(
 @lru_cache(maxsize=1)
 def _load_model() -> Any:
     _ensure_runtime_dirs()
-
     from ultralytics import YOLO
 
     return YOLO(_model_path())
 
 
 def _model_path() -> str:
-    return os.getenv("YOLO_MODEL_PATH", str(DEFAULT_MODEL_PATH))
+    env_path = os.getenv("YOLO_MODEL_PATH")
+    if env_path:
+        return env_path
+    for path in _candidate_model_paths():
+        if path.exists():
+            return str(path)
+    return str(BACKEND_ROOT / "yolov8n.pt")
 
 
 def _model_name() -> str:
@@ -209,13 +222,6 @@ def _default_confidence_threshold() -> float:
 
 def _default_image_size() -> int:
     return int(os.getenv("YOLO_IMAGE_SIZE", DEFAULT_IMAGE_SIZE))
-
-
-def _include_all_classes() -> bool:
-    value = os.getenv("YOLO_INCLUDE_ALL_CLASSES")
-    if value is None:
-        return DEFAULT_INCLUDE_ALL_CLASSES
-    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _ensure_runtime_dirs() -> None:
@@ -237,6 +243,7 @@ def _result_to_scene_objects(
     decoded_height: int,
     output_width: int,
     output_height: int,
+    include_raw: bool,
 ) -> list[SceneObject]:
     names = result.names
     boxes = getattr(result, "boxes", None)
@@ -252,6 +259,8 @@ def _result_to_scene_objects(
         normalized_label = display_label(raw_label)
         if normalized_label is None:
             continue
+        if not include_raw and normalized_label not in SUSTAINABILITY_LABELS:
+            continue
 
         confidence = round(float(box.conf[0]), 4)
         x1, y1, x2, y2 = [float(value) for value in box.xyxy[0].tolist()]
@@ -262,7 +271,6 @@ def _result_to_scene_objects(
             height=round((y2 - y1) * scale_y, 2),
         )
         distance = _estimate_distance(bbox, output_width, output_height)
-
         scene_objects.append(
             SceneObject(
                 name=normalized_label,
@@ -326,7 +334,6 @@ def _raw_labels(result: Any) -> list[str]:
     boxes = getattr(result, "boxes", None)
     if boxes is None:
         return []
-
     return [_raw_label(names, box).strip().lower().replace("_", " ") for box in boxes]
 
 
@@ -354,11 +361,8 @@ def _scene_tags(result: Any, objects: list[SceneObject]) -> list[str]:
         tags.append("outdoor_cues")
     if any(scene_object.name in SUSTAINABILITY_LABELS for scene_object in objects):
         tags.append("sustainability_items_visible")
-    if any(scene_object.name in {"trash_bin", "recycling_bin", "storage_bin"} for scene_object in objects):
-        tags.append("collection_container_visible")
     if not objects and raw_labels:
         tags.append("detections_filtered_as_irrelevant")
-
     return tags
 
 
@@ -368,23 +372,21 @@ def normalize_label(raw_label: str) -> str | None:
 
 def display_label(raw_label: str) -> str | None:
     normalized = normalize_label(raw_label)
-    if normalized:
-        return normalized
-    if _include_all_classes():
-        return raw_label.strip().lower().replace("_", " ")
-    return None
+    if not normalized:
+        return None
+    return _label_aliases().get(normalized, normalized)
 
 
-def _object_category(aeris_label: str) -> str:
-    if aeris_label in SUSTAINABILITY_LABELS:
+def _object_category(label: str) -> str:
+    if label in SUSTAINABILITY_LABELS:
         return "sustainability_item"
-    if aeris_label in PROTECTION_LABELS:
-        return "protection_resource"
     return "other"
 
 
 def _aeris_labels() -> list[str]:
-    return sorted(RELEVANT_LABELS)
+    labels = set(SUSTAINABILITY_LABELS)
+    labels.update(_label_aliases().values())
+    return sorted(labels)
 
 
 @lru_cache(maxsize=1)
@@ -409,5 +411,4 @@ def _dedupe_objects(objects: list[SceneObject]) -> list[SceneObject]:
         existing = best_by_name.get(scene_object.name)
         if existing is None or scene_object.confidence > existing.confidence:
             best_by_name[scene_object.name] = scene_object
-
     return sorted(best_by_name.values(), key=lambda scene_object: scene_object.confidence, reverse=True)

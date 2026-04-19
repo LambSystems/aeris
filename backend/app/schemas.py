@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 RiskLevel = Literal["low", "medium", "high"]
@@ -60,11 +60,25 @@ class DynamicContext(BaseModel):
     source: str = "fixture"
     image_width: int | None = Field(default=None, gt=0)
     image_height: int | None = Field(default=None, gt=0)
+    frame_width: int | None = Field(default=None, gt=0)
+    frame_height: int | None = Field(default=None, gt=0)
     inference_ms: float | None = Field(default=None, ge=0)
     model_name: str | None = None
     scene_type: str | None = None
-    scene_tags: list[str] = []
-    raw_detections: list[RawDetection] = []
+    scene_tags: list[str] = Field(default_factory=list)
+    raw_detections: list[RawDetection] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def sync_dimension_aliases(self) -> "DynamicContext":
+        if self.image_width is None and self.frame_width is not None:
+            self.image_width = self.frame_width
+        if self.image_height is None and self.frame_height is not None:
+            self.image_height = self.frame_height
+        if self.frame_width is None and self.image_width is not None:
+            self.frame_width = self.image_width
+        if self.frame_height is None and self.image_height is not None:
+            self.frame_height = self.image_height
+        return self
 
 
 class RecommendationRequest(BaseModel):
@@ -85,7 +99,7 @@ class RecommendationOutput(BaseModel):
     decision_source: DecisionSource = "fallback_policy"
     actions: list[ActionRecommendation]
     explanation: str
-    missing_insights: list[str] = []
+    missing_insights: list[str] = Field(default_factory=list)
 
 
 class AnalyzeSceneRequest(BaseModel):
@@ -110,7 +124,7 @@ class ExplanationRequest(BaseModel):
     fixed_context: FixedContext
     dynamic_context: DynamicContext
     actions: list[ActionRecommendation]
-    missing_insights: list[str] = []
+    missing_insights: list[str] = Field(default_factory=list)
     provider: DecisionProvider = "gemini"
 
 

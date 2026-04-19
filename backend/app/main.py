@@ -1,15 +1,15 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-
-from app.env_loader import load_app_env
-
-load_app_env()
 
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
+from app.context.fixed_context_service import load_fixed_context
+from app.context.schemas import EnvironmentalFixedContext
 from app.cv.yolo_service import (
     ALLOWED_CONTENT_TYPES,
     MAX_FRAME_BYTES,
@@ -18,6 +18,7 @@ from app.cv.yolo_service import (
     yolo_config,
 )
 from app.data import load_demo_context, load_scene
+from app.env_loader import load_app_env
 from app.fallback_policy import build_fallback_recommendations
 from app.schemas import (
     AnalysisJobResponse,
@@ -33,24 +34,30 @@ from app.schemas import (
     YoloConfigResponse,
 )
 from app.sustainability.adviser import get_sustainability_advice
-from app.sustainability.castnet_mock import load_mock_castnet
-from app.sustainability.schemas import DetectionRequest, SustainabilityAdvice
+from app.sustainability.schemas import DetectionRequest, SustainabilityAdvice, YOLODetection
+from app.vision_state import read_latest_detection
 
 
+load_app_env()
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(
     title="Aeris API",
-    description="Backend API for CASTNET-driven outdoor resource protection recommendations.",
+    description="Backend API for CASTNET-driven sustainability recommendations and YOLO frame analysis.",
     version="0.1.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:8501",
+        "http://127.0.0.1:8501",
     ],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,6 +72,11 @@ def health() -> HealthResponse:
 @app.get("/context/demo", response_model=FixedContext)
 def get_demo_context() -> FixedContext:
     return load_demo_context()
+
+
+@app.get("/context/fixed", response_model=EnvironmentalFixedContext)
+def get_fixed_context(latitude: float | None = None, longitude: float | None = None) -> EnvironmentalFixedContext:
+    return load_fixed_context(latitude=latitude, longitude=longitude)
 
 
 @app.get("/scene/demo", response_model=DynamicContext)
@@ -85,31 +97,35 @@ def scan_frame_config() -> YoloConfigResponse:
 @app.post("/scan-frame", response_model=DynamicContext)
 async def scan_frame(
     frame: UploadFile | None = File(default=None),
+    file: UploadFile | None = File(default=None),
     image_width: int | None = Form(default=None),
     image_height: int | None = Form(default=None),
     confidence_threshold: float | None = Form(default=None),
     image_size: int | None = Form(default=None),
+    include_raw: bool = Form(default=True),
 ) -> DynamicContext:
-    if frame is None:
+    upload = frame or file
+    if upload is None:
         return scan_demo_frame()
 
-    if frame.content_type not in ALLOWED_CONTENT_TYPES:
+    if upload.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=415, detail="Frame must be a JPEG, PNG, or WebP image.")
     if confidence_threshold is not None and not 0 <= confidence_threshold <= 1:
         raise HTTPException(status_code=422, detail="confidence_threshold must be between 0 and 1.")
-    if image_size is not None and not 320 <= image_size <= 1600:
-        raise HTTPException(status_code=422, detail="image_size must be between 320 and 1600.")
+    if image_size is not None and not 256 <= image_size <= 1600:
+        raise HTTPException(status_code=422, detail="image_size must be between 256 and 1600.")
 
-    image_bytes = await frame.read()
+    image_bytes = await upload.read()
     if len(image_bytes) > MAX_FRAME_BYTES:
         raise HTTPException(status_code=413, detail="Frame is too large. Send a compressed sampled frame.")
 
     return scan_frame_bytes(
-        image_bytes,
+        image_bytes=image_bytes,
         image_width=image_width,
         image_height=image_height,
         confidence_threshold=confidence_threshold,
         image_size=image_size,
+        include_raw=include_raw,
     )
 
 
@@ -145,7 +161,6 @@ def run_demo(request: Optional[DemoRunRequest] = None) -> DemoRunResponse:
     fixed_context = load_demo_context()
     dynamic_context = load_scene(scene_key)
     recommendations = build_fallback_recommendations(fixed_context, dynamic_context)
-
     return DemoRunResponse(
         fixed_context=fixed_context,
         dynamic_context=dynamic_context,
@@ -160,5 +175,14 @@ def scan_scene() -> DynamicContext:
 
 @app.post("/sustainability/detect", response_model=SustainabilityAdvice)
 def sustainability_detect(request: DetectionRequest) -> SustainabilityAdvice:
-    castnet = load_mock_castnet()
-    return get_sustainability_advice(request.detection, castnet)
+    fixed_context = load_fixed_context(latitude=request.latitude, longitude=request.longitude)
+    return get_sustainability_advice(
+        detection=request.detection,
+        castnet=fixed_context.castnet,
+        fixed_context=fixed_context,
+    )
+
+
+@app.get("/vision/latest-detection", response_model=YOLODetection | None)
+def latest_vision_detection() -> YOLODetection | None:
+    return read_latest_detection()

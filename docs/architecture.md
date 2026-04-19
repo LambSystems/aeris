@@ -1,446 +1,338 @@
 # Architecture
 
-## Overview
+## Current Demo Architecture
 
-Aeris is built around a live-perception plus asynchronous-reasoning pipeline:
-
-```text
-Live camera stream
-        |
-        v
-YOLO 2D object detection
-        |
-        v
-Stable scene snapshot
-        |
-        v
-Async agentic decision job
-        |
-        v
-Latest protection recommendation
-```
-
-The camera stream should never wait for the LLM. YOLO updates the visible scene state quickly, while Gemini/OpenAI reason asynchronously over the latest structured scene snapshot and CASTNET context.
-
----
-
-## System Goals
-
-The architecture is designed to satisfy six goals:
-
-1. **Keep the phone-style camera stream smooth**
-2. **Use YOLO for 2D object detection**
-3. **Use CASTNET as the environmental context**
-4. **Use an agentic LLM decision layer for ranking and recommendations**
-5. **Keep all LLM output bounded by schemas and allowed actions**
-6. **Preserve fixture/template fallbacks for demo safety**
-
-The key principle:
-
-> Real-time perception and agentic reasoning run at different speeds.
-
----
-
-## High-Level Flow
+Aeris currently uses a split live-vision architecture:
 
 ```text
-CASTNET-derived context
-        |
-        v
-Fixed Context
+React product shell
+  -> polished UI, sidebar, context, recommendation
 
-Live camera stream
-        |
-        v
-YOLO every N frames / seconds
-        |
-        v
-Dynamic Context snapshot
-        |
-        v
-POST /analyze-scene starts async agent job
-        |
-        v
-Gemini primary / OpenAI fallback / template fallback
-        |
-        v
-Latest Recommendation State
-        |
-        v
-UI updates recommendation panel when complete
+Streamlit vision iframe
+  -> camera access, YOLO inference, bounding boxes
+
+FastAPI backend
+  -> fixed context, latest detection bridge, advice generation
 ```
 
-The UI can continue rendering the live camera and detection overlays while the agent is still reasoning.
+This is the stable hackathon demo path. It keeps YOLO running in the Python/GPU environment while preserving the more polished Lovable/React interface.
 
 ---
 
-## Core Architectural Components
+## Why This Shape
 
-### 1. Fixed Context Engine
+We tested three viable paths:
 
-The Fixed Context Engine loads a structured environmental exposure profile derived from CASTNET.
+1. **React + backend YOLO polling**
+   - Good integration.
+   - Less smooth visually because frames travel through HTTP.
 
-Its job is to answer:
+2. **React + browser YOLO ONNX**
+   - Cleanest architecture.
+   - Too sticky on this machine because ONNX Runtime Web was effectively WASM/CPU-bound.
 
-- what environmental stress matters here?
-- how strong is that stress?
-- what resource categories should the agent care about?
+3. **React + Streamlit YOLO iframe**
+   - Best live YOLO performance locally.
+   - Slightly less native visually.
+   - Current chosen demo path.
 
-### Inputs
-
-- processed CASTNET-derived data
-- selected demo location / nearest CASTNET site
-
-### Outputs
-
-- demo location
-- CASTNET profile/site
-- ozone risk
-- deposition risk
-- active risk mode
-- short summary
-
-### Example
-
-```json
-{
-  "location": "Outdoor Garden Demo",
-  "castnet_site": "Demo CASTNET Profile",
-  "pollution_profile": {
-    "ozone_risk": "high",
-    "deposition_risk": "medium"
-  },
-  "risk_mode": "protect_plants_and_sensitive_equipment",
-  "summary": "Elevated ozone and environmental exposure conditions for outdoor plants and sensitive equipment."
-}
-```
+The current priority is demo reliability and smooth-enough real-time perception.
 
 ---
 
-### 2. Live Perception Layer
-
-The live perception layer is responsible for turning a camera frame into a normalized 2D scene snapshot.
-
-Primary implementation:
-
-- **YOLO**
-- 2D bounding boxes
-- confidence scores
-- label normalization
-- lightweight distance / reachability heuristics
-
-Optional stretch:
-
-- Boxer, only if stable without slowing the demo
-
-The perception layer should run faster than the reasoning layer. It should update labels/boxes without waiting for the LLM.
-
-### Output Shape
-
-```json
-{
-  "source": "yolo",
-  "objects": [
-    {
-      "name": "seed_tray",
-      "confidence": 0.94,
-      "distance": 1.0,
-      "reachable": true,
-      "bbox": {
-        "x": 92,
-        "y": 112,
-        "width": 190,
-        "height": 126
-      }
-    }
-  ]
-}
-```
-
----
-
-### 3. Scene State Builder
-
-The Scene State Builder converts noisy detections into the snapshot used for reasoning.
-
-It should:
-
-- normalize labels into the fixed object taxonomy
-- filter low-confidence detections
-- estimate rough distance/reachability
-- decide when the scene has changed meaningfully
-- avoid triggering agent calls for every video frame
-
-Recommended trigger rules:
-
-- user taps **Analyze**
-- object set changes meaningfully
-- detection state stays stable across 2-3 YOLO snapshots
-- at least 5-10 seconds have passed since the last reasoning job
-
-This prevents the LLM from being called too often.
-
----
-
-### 4. Agentic Decision Layer
-
-The Agentic Decision Layer is the main recommendation engine.
-
-It consumes:
-
-- Fixed Context from CASTNET
-- Dynamic Context from YOLO
-- allowed object names
-- allowed action vocabulary
-- output schema
-
-It returns:
-
-- ranked actions
-- target objects
-- concise reasons
-- explanation text
-
-Primary provider:
-
-- Gemini
-
-Secondary provider:
-
-- OpenAI
-
-Fallback:
-
-- template/fallback policy output
-
-The LLM should make ranking decisions from structured scene state, not raw video.
-
-### Bounded Output Schema
-
-```json
-{
-  "actions": [
-    {
-      "rank": 1,
-      "action": "protect_first",
-      "target": "seed_tray",
-      "reason": "Plant-sensitive resource under elevated ozone exposure."
-    }
-  ],
-  "explanation": "Aeris recommends protecting the seed tray first because CASTNET-derived context indicates elevated plant-sensitive exposure."
-}
-```
-
-Allowed actions:
-
-- `protect_first`
-- `move_to_storage`
-- `cover_if_time_allows`
-- `low_priority`
-
-Allowed targets:
-
-- only objects detected in the current scene snapshot
-
----
-
-### 5. Fallback Policy Layer
-
-The fallback policy is not the main product story.
-
-Its job is to keep the demo alive if:
-
-- Gemini is slow or unavailable
-- OpenAI is unavailable
-- network access fails
-- the agent returns invalid JSON
-
-The fallback policy may use simple local scoring and template explanations, but the UI/pitch should frame it as a safety fallback, not the core decision engine.
-
----
-
-### 6. Frontend
-
-The frontend should behave like a phone-style live scene analyzer:
-
-- camera stream remains live
-- YOLO boxes update independently
-- recommendation panel shows latest completed decision
-- pending agent jobs show a lightweight "reasoning..." state
-- the UI never freezes while the LLM is running
-
-Recommended visible states:
+## Runtime Flow
 
 ```text
-Watching scene...
-Objects detected
-Reasoning over latest scene...
-Recommendation updated
-Using fallback recommendation
+Camera
+  -> Streamlit WebRTC
+  -> YOLO .pt model
+  -> detection threshold / class normalization
+  -> boxes drawn in Streamlit video
+  -> latest actionable detection written to .tmp/vision/latest_detection.json
+
+React
+  -> embeds Streamlit iframe
+  -> polls GET /vision/latest-detection
+  -> renders Current Scan
+  -> calls POST /sustainability/detect
+  -> renders Recommendation
+
+FastAPI
+  -> loads fixed context through GET /context/fixed
+  -> reads latest detection bridge file
+  -> generates advice with LLM/cache/fallback
 ```
 
 ---
 
-### 7. Backend API Layer
+## Components
 
-The backend owns:
+### React UI
 
-- schemas
-- CASTNET context loading
-- YOLO scan adapter
-- scene snapshot contracts
-- async analysis jobs
-- latest recommendation state
-- provider abstraction
-- fallback behavior
+Location:
+
+```text
+ui/
+```
+
+Responsibilities:
+
+- render the demo product shell
+- embed Streamlit at `VITE_STREAMLIT_URL`
+- show current scan state
+- show environmental context
+- show recommendation
+- poll backend, not LLM providers
+
+Important file:
+
+```text
+ui/src/pages/Index.tsx
+```
+
+When `VITE_VISION_PROVIDER=streamlit-embed`, the UI uses `StreamlitEmbedPage`.
 
 ---
 
-## API Flow
+### Streamlit YOLO
 
-### Fast Perception Path
+Location:
 
 ```text
+backend/streamlit_app.py
+```
+
+Responsibilities:
+
+- request camera access
+- run YOLO on frames
+- draw bounding boxes
+- filter actionable detections
+- publish the latest detection for React/FastAPI
+
+Config:
+
+```powershell
+$env:AERIS_STREAMLIT_EMBED="1"
+$env:YOLO_MODEL_PATH="C:\Users\akuma\repos\aeris\backend\models\trash-quick-v4-best.pt"
+$env:YOLO_DEVICE="0"
+$env:AERIS_CAMERA_WIDTH="960"
+$env:AERIS_CAMERA_HEIGHT="540"
+$env:YOLO_FRAME_SKIP="1"
+$env:YOLO_IMGSZ="320"
+```
+
+The Streamlit app should not own the polished recommendation UI in embed mode. It only owns live vision.
+
+---
+
+### Vision Bridge
+
+Location:
+
+```text
+backend/app/vision_state.py
+```
+
+Purpose:
+
+```text
+Streamlit process -> local JSON file -> FastAPI endpoint -> React
+```
+
+File:
+
+```text
+.tmp/vision/latest_detection.json
+```
+
+Endpoint:
+
+```text
+GET /vision/latest-detection
+```
+
+This is intentionally simple. It avoids introducing Redis/WebSockets during the hackathon.
+
+---
+
+### FastAPI Backend
+
+Location:
+
+```text
+backend/app/main.py
+```
+
+Primary endpoints:
+
+```text
+GET  /health
+GET  /context/fixed
+GET  /vision/latest-detection
+POST /sustainability/detect
 POST /scan-frame
 ```
 
-Returns the latest normalized YOLO detections quickly.
+Responsibilities:
 
-For the hackathon scaffold, this can return fixture detections until YOLO is wired.
-
-### Async Reasoning Path
-
-```text
-POST /analyze-scene
-```
-
-Starts an asynchronous agentic reasoning job and immediately returns a `job_id`.
-
-The camera UI should continue running.
-
-### Polling Path
-
-```text
-GET /analysis/{job_id}
-GET /analysis/latest
-```
-
-Returns pending, complete, or failed state.
-
-The UI displays the latest completed recommendation when available.
+- load fixed environmental context
+- expose latest YOLO detection
+- generate sustainability advice
+- keep deterministic fallback working
+- cache repeated advice
 
 ---
 
-## Core Schemas
+### Fixed Context
 
-See `docs/team-contracts.md` for the team handoff version of these schemas.
+Fixed context combines:
+
+- browser GPS or default coordinates
+- nearest CASTNET reading
+- Open-Meteo weather
+- Open-Meteo air quality
+- weather.gov alerts
+- local risk flags
+
+Endpoint:
+
+```text
+GET /context/fixed?latitude=40.9478&longitude=-90.3712
+```
+
+The UI should keep this visible because it proves the dataset is active.
+
+---
+
+### Advice Layer
+
+Location:
+
+```text
+backend/app/sustainability/adviser.py
+```
+
+Provider order:
+
+1. Gemini
+2. Anthropic
+3. deterministic fallback
+
+The advice layer receives structured data only:
+
+- detected object class
+- confidence
+- optional bbox
+- fixed context
+- CASTNET reading
+
+It does not process raw video.
+
+The cache key includes:
+
+- object class
+- CASTNET site
+- measurement date
+- risk flags
+
+This prevents repeated LLM calls for the same demo state.
+
+---
+
+## Data Contracts
+
+### Latest Detection
+
+```json
+{
+  "object_class": "aluminum_can",
+  "confidence": 0.84,
+  "bbox": null,
+  "frame_id": "frame_00123",
+  "timestamp": "2026-04-19T06:30:00Z"
+}
+```
 
 ### Fixed Context
 
 ```json
 {
-  "location": "string",
-  "castnet_site": "string",
-  "pollution_profile": {
-    "ozone_risk": "low|medium|high",
-    "deposition_risk": "low|medium|high"
+  "location": {
+    "latitude": 40.9478,
+    "longitude": -90.3712,
+    "label": "40.9478,-90.3712",
+    "source": "browser_gps"
   },
-  "risk_mode": "string",
-  "summary": "string"
+  "castnet": {
+    "site_id": "BVL130",
+    "location": "Bondville, IL",
+    "ozone_ppb": 39.0,
+    "sulfate_ug_m3": 0.68,
+    "nitrate_ug_m3": 2.08,
+    "co_ppb": 41.72,
+    "measurement_date": "2026-04-15"
+  },
+  "risk_flags": ["castnet_elevated_nitrate", "weather_alert_active"],
+  "summary": "Nearest CASTNET context is Bondville, IL..."
 }
 ```
 
-### Dynamic Context
+### Sustainability Advice
 
 ```json
 {
-  "source": "yolo|fixture",
-  "objects": [
-    {
-      "name": "string",
-      "confidence": 0.0,
-      "distance": 0.0,
-      "reachable": true,
-      "bbox": {
-        "x": 0,
-        "y": 0,
-        "width": 0,
-        "height": 0
-      }
-    }
-  ]
-}
-```
-
-### Analysis Job
-
-```json
-{
-  "job_id": "string",
-  "status": "pending|complete|failed",
-  "recommendations": null
-}
-```
-
-### Recommendation Output
-
-```json
-{
-  "decision_source": "agentic_gemini|agentic_openai|fallback_policy",
-  "actions": [
-    {
-      "rank": 1,
-      "action": "protect_first",
-      "target": "seed_tray",
-      "score": null,
-      "reason_tags": ["plant_sensitive", "high_ozone_context"],
-      "reason": "Plant-sensitive resource under elevated ozone exposure."
-    }
-  ],
-  "explanation": "string"
+  "object_detected": "aluminum_can",
+  "confidence": 0.84,
+  "context": "An aluminum can was detected...",
+  "action": "Place it in the nearest recycling bin...",
+  "environment_summary": "Nearest CASTNET context is Bondville, IL...",
+  "risk_flags": ["castnet_elevated_nitrate", "weather_alert_active"],
+  "castnet_site": "Bondville, IL",
+  "decision_source": "llm_gemini"
 }
 ```
 
 ---
 
-## Failure and Fallback Design
+## Performance Model
 
-### If YOLO is unstable
+Real-time perception and advice run at different speeds:
 
-Use fixture detections from a pre-captured demo frame.
+```text
+YOLO/video: fast path, visible immediately in iframe
+Advice: event-based path, cached, may take 1-3 seconds on first LLM call
+Fixed context: loaded once per coordinate/session
+```
 
-### If live camera is unstable
-
-Use a pre-captured demo image while preserving the same scene snapshot schema.
-
-### If Gemini is slow
-
-Keep the latest completed recommendation visible and show a pending reasoning state.
-
-### If Gemini fails
-
-Try OpenAI.
-
-### If all LLM providers fail
-
-Use fallback policy/template output.
-
-### If no recommendation is ready
-
-Show detections and a "reasoning over latest scene" state.
+We do not call an LLM on every frame.
 
 ---
 
-## Why This Architecture Works
+## Fallbacks
 
-This architecture resolves the core hackathon contradiction:
+If YOLO/Streamlit is slow:
 
-- live camera and YOLO perception need to feel real-time
-- LLM reasoning will be slower and should be asynchronous
-- the UI should never block on reasoning
-- agentic decision-making remains the main story
-- fallback logic keeps the demo stable
+- reduce camera resolution
+- increase `YOLO_FRAME_SKIP`
+- keep `YOLO_IMGSZ=320`
 
-One-sentence architecture summary:
+If LLM fails:
 
-**Aeris keeps camera perception live with YOLO, then asynchronously uses CASTNET context and an agentic LLM decision layer to recommend what outdoor resources should be protected first.**
+- deterministic fallback still returns advice
+
+If Streamlit detection bridge fails:
+
+- test `/vision/latest-detection`
+- use `/sustainability/detect` manually for the pitch
+
+If browser YOLO becomes necessary:
+
+- see `docs/yolo-browser.md`
+- treat it as experimental unless performance improves
+
+---
+
+## One-Sentence Architecture Summary
+
+**Aeris embeds Python/GPU YOLO for live vision inside a React product shell, then uses FastAPI to combine latest detections with CASTNET/weather context and cached LLM-backed sustainability advice.**
