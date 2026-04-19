@@ -1,284 +1,182 @@
 # Aeris Backend
 
-FastAPI service for the Aeris hackathon demo.
+FastAPI + Streamlit service that takes object detections from a YOLO pipeline and air quality data from CASTNET, then uses Claude (Anthropic) to generate concise sustainability advice.
 
-## Run
+---
+
+## How It Works
+
+```
+YOLO Pipeline (teammate)
+        │
+        │  POST /sustainability/detect
+        │  { object_class, confidence, bbox, frame_id, timestamp }
+        ▼
+┌─────────────────────────────────────┐
+│         FastAPI  (main.py)          │
+│                                     │
+│  1. Receives YOLO detection JSON    │
+│  2. Loads CASTNET air quality data  │
+│     (mock now → real API later)     │
+│  3. Calls get_sustainability_advice │
+└──────────────────┬──────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────┐
+│        adviser.py (LLM layer)       │
+│                                     │
+│  Builds prompt:                     │
+│   - detected object + confidence    │
+│   - ozone, sulfate, nitrate, CO     │
+│                                     │
+│  Calls Claude (claude-sonnet-4-6)   │
+│                                     │
+│  Parses JSON response into:         │
+│   - context  (what + why)           │
+│   - action   (what to do now)       │
+└──────────────────┬──────────────────┘
+                   │
+                   ▼
+        SustainabilityAdvice
+        {
+          object_detected,
+          confidence,
+          context,   ← one sentence: object, material, env impact
+          action     ← one sentence: exactly what to do
+        }
+                   │
+          ┌────────┴────────┐
+          ▼                 ▼
+     Frontend UI       Streamlit
+     (teammate)        (demo/dev)
+```
+
+---
+
+## Folder Structure
+
+```
+backend/
+├── app/
+│   ├── main.py                    # FastAPI routes
+│   ├── schemas.py                 # Shared Pydantic models (BoundingBox, etc.)
+│   ├── sustainability/
+│   │   ├── schemas.py             # YOLODetection, CASTNETReading, SustainabilityAdvice
+│   │   ├── castnet_mock.py        # Mock CASTNET data — swap this for real API
+│   │   └── adviser.py             # Prompt + Claude call + response parsing
+│   └── cv/
+│       └── yolo_service.py        # YOLO stub — replace with real pipeline output
+└── streamlit_app.py               # Dev UI to test detections manually
+```
+
+---
+
+## Setup
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+Create a `.env` file in `backend/`:
+
+```
+ANTHROPIC_API_KEY=your_key_here
+```
+
+---
+
+## Running
+
+**API server:**
+```bash
 uvicorn app.main:app --reload
 ```
+Runs at `http://localhost:8000` — interactive docs at `http://localhost:8000/docs`
 
-The API runs at:
-
-```text
-http://localhost:8000
+**Streamlit demo UI:**
+```bash
+streamlit run streamlit_app.py
 ```
+Runs at `http://localhost:8501` — lets you manually set detection inputs and see advice output.
 
-Swagger docs:
+---
 
-```text
-http://localhost:8000/docs
-```
+## The Main Endpoint
 
-## Core Endpoints
+### `POST /sustainability/detect`
 
-```text
-GET  /health
-GET  /context/demo
-GET  /scan-frame/config
-POST /scan-frame
-POST /analyze-scene
-GET  /analysis/latest
-GET  /analysis/{job_id}
-```
+This is the endpoint the YOLO pipeline calls when it detects an object with ≥90% confidence.
 
-Compatibility/demo endpoints:
-
-```text
-GET  /scene/demo
-GET  /scene/demo-after-move
-POST /recommend
-POST /demo/run
-POST /scan
-```
-
-`/scan-frame` runs the live YOLO adapter when a frame upload is provided and falls back to the fixture scan when no frame is provided. `/scan` remains a fixture-backed compatibility endpoint.
-
-`/analyze-scene` is the async agentic decision path. It returns a job id immediately while Gemini/OpenAI/fallback analysis runs in the background.
-
-`/analysis/latest` returns the latest completed recommendation for polling UIs.
-
-`/recommend` and `/demo/run` are compatibility helpers for local testing and fallback demos.
-
-## Live YOLO Scan
-
-`POST /scan-frame` accepts an optional multipart frame upload:
-
-```text
-frame: image file
-image_width: original frame width
-image_height: original frame height
-confidence_threshold: optional 0-1 override
-image_size: optional YOLO inference size, 320-1600
-```
-
-If no frame is provided, the endpoint returns the fixture-backed demo scan. Uploaded frames are decoded in memory, passed through YOLO, normalized into Aeris object labels, and discarded after the request.
-
-Accepted frame content types:
-
-```text
-image/jpeg
-image/png
-image/webp
-```
-
-Frames larger than 8 MB are rejected. The frontend should send a compressed sampled frame, not a full video stream.
-
-Optional environment variables:
-
-```text
-YOLO_MODEL_PATH=backend/.cache/yolov8n.pt
-YOLO_CONFIDENCE_THRESHOLD=0.35
-YOLO_IMAGE_SIZE=640
-YOLO_INCLUDE_ALL_CLASSES=true
-YOLO_LABEL_ALIASES_PATH=backend/app/cv/label_aliases.json
-```
-
-`GET /scan-frame/config` returns accepted image types, max frame size, the default confidence threshold, the model name, and label aliases.
-
-## Backend Input / Output Contract
-
-See `../docs/team-contracts.md` for the full team handoff contract.
-
-Backend receives:
-
-- sampled frame or fixture request for `/scan-frame`
-- `DynamicContext` JSON for `/analyze-scene`
-- optional `provider`: `gemini`, `openai`, or `template`
-
-Backend returns:
-
-- `FixedContext` from `/context/demo`
-- `DynamicContext` from `/scan-frame`
-- `AnalysisJobResponse` from `/analyze-scene`
-- `RecommendationOutput` from `/analysis/{job_id}` when complete
-
-Do not call the agent for every frame. `/scan-frame` should stay fast. `/analyze-scene` should start a background job and return immediately.
-
-## YOLO Adapter Contract
-
-Replace `app/cv/yolo_service.py` with real YOLO inference when ready, but keep this output shape:
-
+**Request body:**
 ```json
 {
-  "source": "yolo",
-  "image_width": 920,
-  "image_height": 460,
-  "inference_ms": 72.4,
-  "model_name": "yolov8n.pt",
-  "scene_type": "outdoor",
-  "scene_tags": ["outdoor_cues", "sustainability_items_visible"],
-  "objects": [
-    {
-      "name": "bottle",
-      "raw_label": "bottle",
-      "category": "sustainability_item",
-      "confidence": 0.94,
-      "distance": 1.0,
-      "reachable": true,
-      "bbox": {
-        "x": 92,
-        "y": 112,
-        "width": 190,
-        "height": 126
-      }
-    }
-  ]
+  "detection": {
+    "object_class": "soda_can",
+    "confidence": 0.94,
+    "frame_id": "frame_042",
+    "timestamp": "2026-04-18T10:30:00Z",
+    "bbox": { "x": 120, "y": 340, "width": 80, "height": 60 }
+  }
 }
 ```
 
-Boxes must be in the same coordinate space as the sampled frame.
-
-The default `yolov8n.pt` model can detect common COCO classes such as `bottle` and `cup`, but it does not have a dedicated `can` class. Use `YOLO_MODEL_PATH` plus `YOLO_LABEL_ALIASES_PATH` for reliable can, trash, wrapper, and bin detection from a custom/fine-tuned model.
-
-By default Aeris keeps the curated aliases where they exist, but it also exposes the rest of the stock YOLO classes instead of filtering them out. Set `YOLO_INCLUDE_ALL_CLASSES=false` if you want mapped-only detections again.
-
-## Quick Can / Bottle Fine-Tune
-
-If you want better `can` and `bottle` detection, the fast path is to fine-tune the local `yolov8n.pt` checkpoint that is already cached in `backend/.cache/`.
-
-Important: YOLO detection training needs bounding-box annotations, not just class folders. A folder like `/can` or `/bottle` is enough for classification, but not enough for object detection.
-
-Expected dataset layout:
-
-```text
-backend/datasets/can_bottle/
-  images/
-    train/
-      can_001.jpg
-      bottle_001.jpg
-    val/
-      can_101.jpg
-  labels/
-    train/
-      can_001.txt
-      bottle_001.txt
-    val/
-      can_101.txt
+**Response:**
+```json
+{
+  "object_detected": "soda_can",
+  "confidence": 0.94,
+  "context": "A soda can was detected — aluminum takes over 80 years to decompose and the elevated ozone levels here accelerate surface oxidation.",
+  "action": "Place it in the nearest blue recycling bin; aluminum cans are accepted at all municipal recycling facilities."
+}
 ```
 
-Each label file must match the image filename and contain one YOLO box per line:
+`bbox` is optional. All other fields are required.
 
-```text
-<class_id> <x_center> <y_center> <width> <height>
+---
+
+## For Teammates
+
+### YOLO teammate
+Your pipeline should POST to `/sustainability/detect` whenever a detection exceeds 90% confidence. The expected JSON shape for `detection` is:
+
+| Field | Type | Notes |
+|---|---|---|
+| `object_class` | string | e.g. `"soda_can"`, `"plastic_bottle"` |
+| `confidence` | float (0–1) | Must be ≥ 0.90 to be meaningful |
+| `frame_id` | string | Any identifier for the source frame |
+| `timestamp` | string | ISO 8601 format |
+| `bbox` | object or null | `{ x, y, width, height }` in pixels |
+
+### Frontend teammate
+Poll or receive the `SustainabilityAdvice` response from `/sustainability/detect`. Display:
+- `context` — the environmental concern (shown as an info/warning)
+- `action` — the directive (shown as a call-to-action)
+- Show a loading state while the request is in flight (Claude call takes ~1–2s)
+
+### CASTNET teammate
+Replace `app/sustainability/castnet_mock.py` with a real API call. The function signature to match:
+
+```python
+def load_castnet(location: str | None = None) -> CASTNETReading:
+    ...
 ```
 
-Use these class ids:
+`CASTNETReading` fields: `site_id`, `location`, `ozone_ppb`, `sulfate_ug_m3`, `nitrate_ug_m3`, `co_ppb`, `measurement_date`.
 
-```text
-0 = can
-1 = bottle
-```
+---
 
-A starter dataset YAML lives at `backend/training/can_bottle.data.example.yaml`.
+## Other Endpoints
 
-Run a short fine-tune:
+These exist from an earlier version of the project and are still usable for testing:
 
-```bash
-cd backend
-.venv\Scripts\python.exe scripts\train_yolo.py --data training\can_bottle.data.yaml --epochs 20 --batch 8 --device cpu
-```
-
-The script writes checkpoints under `backend/.cache/yolo-runs/` and prints the exact `YOLO_MODEL_PATH` to use when training finishes.
-
-Then point the backend at the new weights:
-
-```text
-YOLO_MODEL_PATH=backend/.cache/yolo-runs/can-bottle-quick/weights/best.pt
-```
-
-## Streamlit Live Detector
-
-For a fast local check before any fine-tuning, you can run a small Streamlit viewer that uses the same YOLO model and Aeris label normalization directly.
-
-```bash
-cd backend
-.venv\Scripts\activate
-pip install -r requirements.txt
-streamlit run streamlit_app.py
-```
-
-The app supports:
-
-- browser camera snapshots
-- image uploads
-- desktop webcam quick-refresh mode
-- drawn boxes plus normalized Aeris labels
-
-Best stock-model test objects right now:
-
-```text
-bottle
-cup
-wine glass
-potted plant
-scissors
-cell phone
-laptop
-keyboard
-remote
-suitcase
-```
-
-Those currently map into these Aeris labels without custom training:
-
-```text
-bottle
-cup
-glass_container
-plant_pot
-metal_tool
-electronics_case
-storage_bin
-```
-
-## Realtime Webcam Detector
-
-If you need boxes to follow objects continuously, use the local OpenCV loop instead of the snapshot-style API flow.
-
-```bash
-cd backend
-.venv\Scripts\python.exe scripts\realtime_yolo.py --imgsz 320 --conf 0.25
-```
-
-This path is much faster because it:
-
-- skips HTTP upload round-trips
-- keeps the model loaded in one local process
-- uses webcam frames directly
-- uses YOLO tracking so boxes stay attached to moving objects
-
-Useful flags:
-
-```text
---imgsz 320         faster than 640 on CPU
---frame-skip 2      infer every other frame for smoother display
---show-raw          show non-Aeris YOLO classes too
---camera 1          switch webcams
-```
-
-For immediate responsiveness on CPU, start around:
-
-```bash
-.venv\Scripts\python.exe scripts\realtime_yolo.py --imgsz 320 --conf 0.25 --frame-skip 1
-```
-
-If that is still heavy, try:
-
-```bash
-.venv\Scripts\python.exe scripts\realtime_yolo.py --imgsz 256 --conf 0.25 --frame-skip 2
-```
+| Endpoint | Description |
+|---|---|
+| `GET /health` | Service health check |
+| `POST /analyze-scene` | Async agentic scene analysis (returns job ID) |
+| `GET /analysis/latest` | Latest completed analysis result |
+| `GET /analysis/{job_id}` | Poll a specific analysis job |
+| `POST /demo/run` | Full demo run with fixture data |
+| `POST /scan-frame` | Returns mock YOLO scene data |

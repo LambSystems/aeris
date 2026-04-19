@@ -5,6 +5,10 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+from app.env_loader import load_app_env
+
+load_app_env()
+
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
 from app.cv.yolo_service import (
     ALLOWED_CONTENT_TYPES,
@@ -28,6 +32,9 @@ from app.schemas import (
     RecommendationRequest,
     YoloConfigResponse,
 )
+from app.sustainability.adviser import get_sustainability_advice
+from app.sustainability.castnet_mock import load_mock_castnet
+from app.sustainability.schemas import DetectionRequest, SustainabilityAdvice
 
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -149,3 +156,9 @@ def run_demo(request: Optional[DemoRunRequest] = None) -> DemoRunResponse:
 @app.post("/scan", response_model=DynamicContext)
 def scan_scene() -> DynamicContext:
     return scan_demo_frame()
+
+
+@app.post("/sustainability/detect", response_model=SustainabilityAdvice)
+def sustainability_detect(request: DetectionRequest) -> SustainabilityAdvice:
+    castnet = load_mock_castnet()
+    return get_sustainability_advice(request.detection, castnet)
