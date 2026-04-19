@@ -1,4 +1,6 @@
-import * as ort from "onnxruntime-web";
+import * as ort from "onnxruntime-web/wasm";
+import ortWasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.mjs?url";
+import ortWasmBinaryUrl from "onnxruntime-web/ort-wasm-simd-threaded.wasm?url";
 
 import type { DetectedObject, ScanFrameResponse } from "@/lib/types";
 import { nonMaxSuppression } from "./nms";
@@ -27,8 +29,12 @@ type LetterboxMeta = {
 };
 
 export async function createBrowserYoloProvider(): Promise<VisionProvider> {
-  ort.env.wasm.wasmPaths = "/ort/";
+  ort.env.wasm.wasmPaths = {
+    mjs: ortWasmModuleUrl,
+    wasm: ortWasmBinaryUrl,
+  };
   ort.env.wasm.numThreads = 1;
+  ort.env.wasm.proxy = false;
 
   const [session, classNames] = await Promise.all([
     ort.InferenceSession.create(MODEL_PATH, {

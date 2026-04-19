@@ -88,14 +88,21 @@ export function useCameraScanner({
 
   useEffect(() => {
     let cancelled = false;
-    void createPreferredVisionProvider().then((provider) => {
-      if (cancelled) {
-        void provider.dispose?.();
-        return;
-      }
-      providerRef.current = provider;
-      setVisionSource(provider.source);
-    });
+    void createPreferredVisionProvider()
+      .then((provider) => {
+        if (cancelled) {
+          void provider.dispose?.();
+          return;
+        }
+        providerRef.current = provider;
+        setVisionSource(provider.source);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Browser YOLO failed to initialize";
+        if (!cancelled) {
+          setCameraError(`Browser YOLO failed: ${message}`);
+        }
+      });
 
     return () => {
       cancelled = true;
