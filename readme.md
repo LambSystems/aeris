@@ -1,4 +1,4 @@
-# Aeris
+# Aeris — The Environmental Intelligence System
 
 **Aeris** is a pollution-aware scene analyzer for outdoor sustainability.
 
@@ -314,3 +314,11 @@ Current goal:
 - The platform will expand into AR interfaces, overlaying environmental data and risk signals directly onto the user’s real-world view.
 - We explored using Boxer, a newly released spatial computing framework, but chose not to adopt it due to its early-stage maturity and limited ecosystem.
 - Boxer remains a future integration target once the framework stabilizes and becomes suitable for production-level AR/VR deployment.
+
+## Acknowledgement
+- Incalos. “GitHub - Incalos/YOLO-Datasets-And-Training-Methods: This Project Involves Making Custom Datasets for the YOLO Series and Model Training Methods for YOLO.” GitHub, 2025, github.com/Incalos/YOLO-Datasets-And-Training-Methods.
+
+-“Single Object.” Epa.gov, 2025, awsedap.epa.gov/public/single/?appid=efa6d1bf-4cab-4e17-9e14-8046adfe9249&sheet=3495c3da-aca4-494b-a1d8-d6d6a0571cbc&opt=currsel%2ctxmenu&bookmark=6ebdada3-18f6-4831-a4b6-9d6e1a14a446.
+
+- DeTone, Daniel. “ Introducing Boxer: Open-World 3D Bounding Boxes from 2D.” LinkedIn, 8 Apr. 2026, www.linkedin.com/posts/ddetone_introducing-boxer-open-world-3d-bounding-ugcPost-7447698521585119232-I501?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEAnQ9sBpX8leronVmNrrorVRv07HFp4o_w.
+
