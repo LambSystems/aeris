@@ -3,8 +3,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from dotenv import load_dotenv
-load_dotenv()
+from app.env_loader import load_app_env
+
+load_app_env()
 
 from app.cv.pipeline import run
 

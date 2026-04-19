@@ -1,10 +1,11 @@
 from typing import Optional
 
-from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
+from app.env_loader import load_app_env
+
+load_app_env()
 
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
 from app.cv.yolo_service import scan_demo_frame

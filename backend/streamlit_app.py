@@ -9,11 +9,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 import av
 import cv2
 import streamlit as st
-from dotenv import load_dotenv
 from streamlit_webrtc import RTCConfiguration, VideoTransformerBase, webrtc_streamer
 from ultralytics import YOLO
 
-load_dotenv()
+from app.env_loader import load_app_env
+
+load_app_env()
 
 from app.cv.pipeline import (
     COCO_TO_SUSTAINABILITY,
