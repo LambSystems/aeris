@@ -173,7 +173,7 @@ These remain from the earlier async scene-analysis version and are useful for co
 |---|---|
 | `GET /health` | Service health check |
 | `GET /context/demo` | Demo fixed context |
-| `POST /scan-frame` | Fixture or uploaded-frame detection stub |
+| `POST /scan-frame` | Fixture or uploaded-frame YOLO detection path |
 | `POST /analyze-scene` | Async agentic scene analysis |
 | `GET /analysis/latest` | Latest completed analysis result |
 | `GET /analysis/{job_id}` | Poll a specific analysis job |
@@ -182,7 +182,7 @@ These remain from the earlier async scene-analysis version and are useful for co
 
 `/scan-frame` still accepts optional multipart field `file` and returns fixture detections until YOLO is fully wired.
 
-When a frame is uploaded, `/scan-frame` returns YOLO detections in the uploaded frame coordinate space:
+When a frame is uploaded, `/scan-frame` returns YOLO detections in the uploaded frame coordinate space. The default minimum confidence is `0.20` for demo reliability.
 
 ```json
 {
@@ -202,6 +202,12 @@ When a frame is uploaded, `/scan-frame` returns YOLO detections in the uploaded 
 ```
 
 The frontend should scale boxes using `frame_width` and `frame_height`. If YOLO/OpenCV is unavailable, the endpoint falls back instead of crashing.
+
+Debug mode exposes all raw YOLO classes, including non-advice classes such as `person`:
+
+```text
+POST /scan-frame?include_raw=true&min_confidence=0.05
+```
 
 ---
 

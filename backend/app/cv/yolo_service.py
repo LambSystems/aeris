@@ -8,7 +8,7 @@ from app.schemas import BoundingBox, DynamicContext, SceneObject
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL_PATH = BACKEND_ROOT / "yolov8n.pt"
-CONF_THRESHOLD = 0.45
+CONF_THRESHOLD = 0.20
 COCO_TO_SUSTAINABILITY: dict[str, str] = {
     "bottle": "plastic_bottle",
     "cup": "styrofoam_cup",

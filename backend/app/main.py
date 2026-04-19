@@ -78,7 +78,7 @@ def get_demo_scene_after_move() -> DynamicContext:
 async def scan_frame(
     file: UploadFile | None = File(default=None),
     include_raw: bool = False,
-    min_confidence: float = 0.45,
+    min_confidence: float = 0.20,
 ) -> DynamicContext:
     if file is None:
         return scan_demo_frame()
