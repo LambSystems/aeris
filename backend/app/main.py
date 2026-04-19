@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from app.analysis_store import create_analysis_job, get_analysis_job, get_latest_analysis, run_analysis_job
+from app.context.fixed_context_service import load_fixed_context
+from app.context.schemas import EnvironmentalFixedContext
 from app.cv.yolo_service import detect_objects, scan_demo_frame
 from app.data import load_demo_context, load_scene
 from app.fallback_policy import build_fallback_recommendations
@@ -23,7 +25,6 @@ from app.schemas import (
     RecommendationRequest,
 )
 from app.sustainability.adviser import get_sustainability_advice
-from app.sustainability.castnet_service import load_castnet
 from app.sustainability.schemas import DetectionRequest, SustainabilityAdvice
 
 
@@ -53,6 +54,11 @@ def health() -> HealthResponse:
 @app.get("/context/demo", response_model=FixedContext)
 def get_demo_context() -> FixedContext:
     return load_demo_context()
+
+
+@app.get("/context/fixed", response_model=EnvironmentalFixedContext)
+def get_fixed_context(latitude: float | None = None, longitude: float | None = None) -> EnvironmentalFixedContext:
+    return load_fixed_context(latitude=latitude, longitude=longitude)
 
 
 @app.get("/scene/demo", response_model=DynamicContext)
@@ -125,5 +131,9 @@ def scan_scene() -> DynamicContext:
 
 @app.post("/sustainability/detect", response_model=SustainabilityAdvice)
 def sustainability_detect(request: DetectionRequest) -> SustainabilityAdvice:
-    castnet = load_castnet()
-    return get_sustainability_advice(request.detection, castnet)
+    fixed_context = load_fixed_context(latitude=request.latitude, longitude=request.longitude)
+    return get_sustainability_advice(
+        detection=request.detection,
+        castnet=fixed_context.castnet,
+        fixed_context=fixed_context,
+    )

@@ -69,6 +69,8 @@ Request:
 
 ```json
 {
+  "latitude": 40.9478,
+  "longitude": -90.3712,
   "detection": {
     "object_class": "soda_can",
     "confidence": 0.94,
@@ -91,6 +93,44 @@ Response:
 ```
 
 `bbox` is optional. All other fields are required.
+
+`latitude` and `longitude` are optional. If provided, the backend builds a richer fixed context from GPS location, processed CASTNET, Open-Meteo weather, Open-Meteo air quality, and weather.gov alerts. If omitted, it uses the demo location near Galesburg, IL.
+
+Response includes the original advice fields plus optional environment metadata:
+
+```json
+{
+  "object_detected": "soda_can",
+  "confidence": 0.94,
+  "context": "A soda can was detected...",
+  "action": "Place it in a recycling bin...",
+  "environment_summary": "Nearest CASTNET context is Bondville, IL...",
+  "risk_flags": ["castnet_elevated_nitrate"],
+  "castnet_site": "Bondville, IL"
+}
+```
+
+---
+
+## Fixed Context Endpoint
+
+### `GET /context/fixed`
+
+Use this to test the location/environment layer directly:
+
+```text
+GET /context/fixed?latitude=40.9478&longitude=-90.3712
+```
+
+The response includes:
+
+- browser/default location
+- processed CASTNET reading
+- weather from Open-Meteo when network is available
+- air quality from Open-Meteo when network is available
+- active weather.gov alerts when available
+- deterministic `risk_flags`
+- `source_status` so the demo can show whether each source was live or fallback
 
 ---
 
@@ -156,6 +196,12 @@ From repo root, policy/fallback checks:
 
 ```bash
 python scripts\test_backend_policy.py
+```
+
+Fixed context checks:
+
+```bash
+python scripts\test_fixed_context.py
 ```
 
 With the API running, from repo root:

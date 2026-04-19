@@ -134,6 +134,8 @@ Request:
 
 ```json
 {
+  "latitude": 40.9478,
+  "longitude": -90.3712,
   "detection": {
     "object_class": "soda_can",
     "confidence": 0.94,
@@ -143,6 +145,8 @@ Request:
   }
 }
 ```
+
+`latitude` and `longitude` are optional. If present, the backend builds a fixed environmental context from GPS location, processed CASTNET, Open-Meteo weather, Open-Meteo air quality, and weather.gov alerts. If external APIs are unavailable, CASTNET and deterministic fallback advice still work.
 
 Response:
 
@@ -181,6 +185,7 @@ The response may take 1-2 seconds when an LLM provider is used, so the UI should
 - Keep `POST /sustainability/detect` stable.
 - Process CASTNET data with `scripts/process_castnet.py`.
 - Load `data/castnet/processed/current_reading.json` in the sustainability endpoint.
+- Provide `GET /context/fixed` for testing GPS/weather/air-quality fixed context.
 - Keep deterministic fallback advice so the demo does not depend fully on an LLM key/network.
 - Keep older demo endpoints available only as compatibility helpers.
 

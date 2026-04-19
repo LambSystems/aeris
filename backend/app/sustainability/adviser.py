@@ -3,6 +3,7 @@ import os
 
 import anthropic
 
+from app.context.schemas import EnvironmentalFixedContext
 from app.sustainability.fallback_advice import build_fallback_advice
 from app.sustainability.schemas import CASTNETReading, SustainabilityAdvice, YOLODetection
 
@@ -24,13 +25,19 @@ Example for a soda can:
 }"""
 
 
-def _build_prompt(detection: YOLODetection, castnet: CASTNETReading) -> str:
+def _build_prompt(
+    detection: YOLODetection,
+    castnet: CASTNETReading,
+    fixed_context: EnvironmentalFixedContext | None = None,
+) -> str:
     payload = {
         "yolo_detection": detection.model_dump(),
         "castnet_reading": castnet.model_dump(),
     }
+    if fixed_context is not None:
+        payload["fixed_context"] = fixed_context.model_dump()
     return (
-        "Analyze this detection and air quality data, then return the JSON response as specified.\n\n"
+        "Analyze this detection, air quality data, and optional fixed context, then return the JSON response as specified.\n\n"
         f"{json.dumps(payload, indent=2)}"
     )
 
@@ -55,10 +62,11 @@ def _parse_response(raw: str, detection: YOLODetection) -> SustainabilityAdvice:
 def get_sustainability_advice(
     detection: YOLODetection,
     castnet: CASTNETReading,
+    fixed_context: EnvironmentalFixedContext | None = None,
 ) -> SustainabilityAdvice:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        return build_fallback_advice(detection, castnet)
+        return build_fallback_advice(detection, castnet, fixed_context)
 
     try:
         client = anthropic.Anthropic(api_key=api_key)
@@ -67,12 +75,19 @@ def get_sustainability_advice(
             max_tokens=1024,
             temperature=0.4,
             system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": _build_prompt(detection, castnet)}],
+            messages=[{"role": "user", "content": _build_prompt(detection, castnet, fixed_context)}],
         )
 
         raw = "".join(
             block.text for block in message.content if getattr(block, "type", None) == "text"
         )
-        return _parse_response(raw, detection)
+        advice = _parse_response(raw, detection)
+        return advice.model_copy(
+            update={
+                "environment_summary": fixed_context.summary if fixed_context else None,
+                "risk_flags": fixed_context.risk_flags if fixed_context else [],
+                "castnet_site": castnet.location,
+            }
+        )
     except Exception:
-        return build_fallback_advice(detection, castnet)
+        return build_fallback_advice(detection, castnet, fixed_context)
