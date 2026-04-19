@@ -5,6 +5,8 @@ __pycache__/
 venv/
 .env
 data/castnet/raw/
+backend/models/*.pt
+backend/models/*.onnx
 
 # Node
 node_modules/

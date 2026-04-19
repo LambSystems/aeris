@@ -72,7 +72,7 @@ def scan_frame_from_bytes(
 
         h, w = img.shape[:2]
         model = _get_model()
-        results = model(img, verbose=False)[0]
+        results = model(img, conf=confidence_threshold, verbose=False)[0]
 
         objects: list[SceneObject] = []
         for box in results.boxes:

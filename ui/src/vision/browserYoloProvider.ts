@@ -9,7 +9,12 @@ import type { VisionProvider } from "./types";
 const MODEL_SIZE = 640;
 const MODEL_PATH = "/models/yolo/best.onnx";
 const CLASSES_PATH = "/models/yolo/classes.json";
-const CONFIDENCE_THRESHOLD = 0.25;
+const CONFIDENCE_THRESHOLD = 0.35;
+const MAX_BOX_AREA_RATIO = 0.45;
+const MAX_BOX_WIDTH_RATIO = 0.78;
+const MAX_BOX_HEIGHT_RATIO = 0.82;
+const MAX_BOX_ASPECT_RATIO = 4.5;
+const MIN_BOX_AREA_RATIO = 0.002;
 const CLASS_ALIASES: Record<string, string> = {
   bottle: "plastic_bottle",
   cup: "paper",
@@ -181,6 +186,7 @@ function parseDetectionRow(row: Float32Array, classNames: string[], meta: Letter
   const width = clamp(x2, 0, meta.sourceWidth) - x;
   const height = clamp(y2, 0, meta.sourceHeight) - y;
   if (width <= 1 || height <= 1) return null;
+  if (!isPlausibleObjectBox(width, height, meta)) return null;
 
   return {
     name: normalizeClassName(classNames[classIndex] ?? `class_${classIndex}`),
@@ -193,6 +199,23 @@ function parseDetectionRow(row: Float32Array, classNames: string[], meta: Letter
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function isPlausibleObjectBox(width: number, height: number, meta: LetterboxMeta): boolean {
+  const frameArea = meta.sourceWidth * meta.sourceHeight;
+  const boxArea = width * height;
+  const areaRatio = boxArea / frameArea;
+  const widthRatio = width / meta.sourceWidth;
+  const heightRatio = height / meta.sourceHeight;
+  const aspectRatio = Math.max(width / height, height / width);
+
+  return (
+    areaRatio >= MIN_BOX_AREA_RATIO &&
+    areaRatio <= MAX_BOX_AREA_RATIO &&
+    widthRatio <= MAX_BOX_WIDTH_RATIO &&
+    heightRatio <= MAX_BOX_HEIGHT_RATIO &&
+    aspectRatio <= MAX_BOX_ASPECT_RATIO
+  );
 }
 
 function normalizeClassName(value: string): string {
