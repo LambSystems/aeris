@@ -182,3 +182,21 @@ Only fire this when YOLO confidence is ≥ 0.90. The call takes ~1–2 seconds (
 ## One-Line Pitch
 
 **Aeris uses YOLO object detection and CASTNET air quality data to give people two-line, grounded sustainability advice the moment they encounter waste.**
+
+---
+
+## Custom Model Notes
+
+The full record of the custom trash detector work lives in:
+
+```text
+docs/trash-model.md
+```
+
+That includes:
+
+- dataset annotation iterations
+- fine-tuning history
+- preprocessing improvements
+- current model quality
+- Streamlit and runtime integration work

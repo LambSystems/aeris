@@ -1,8 +1,0 @@
-path: .
-train: images/train
-val: images/val
-
-names:
-  0: can
-  1: paper
-  2: bottle

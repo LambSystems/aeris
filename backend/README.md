@@ -243,3 +243,11 @@ Detailed notes for the current custom trash model live in:
 ```text
 docs/trash-model.md
 ```
+
+That document includes:
+
+- dataset annotation history
+- preprocessing and sanitation work
+- training run history from `v2` through `v4`
+- current checkpoint recommendation
+- runtime integration into Streamlit and local realtime testing
