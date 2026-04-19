@@ -9,10 +9,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
+from PIL import Image
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SOURCE_DIR = REPO_ROOT / "new_dataset" / "My First Project.coco"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "backend" / "datasets" / "trash_coco_yolo"
+PREFERRED_CLASS_ORDER = ["can", "paper", "bottle"]
 
 CLASS_NAME_OVERRIDES = {
     "can": "can",
@@ -106,13 +109,13 @@ def build_category_map(split_dirs: list[Path]) -> tuple[dict[int, int], list[str
         raw_categories.update({category["id"]: category["name"] for category in coco["categories"]})
         used_category_ids.update(annotation["category_id"] for annotation in coco["annotations"])
 
-    normalized_names: list[str] = []
-    category_id_map: dict[int, int] = {}
+    discovered_names = {normalized_class_name(raw_categories[category_id]) for category_id in sorted(used_category_ids)}
+    normalized_names = [name for name in PREFERRED_CLASS_ORDER if name in discovered_names]
+    normalized_names.extend(sorted(discovered_names - set(normalized_names)))
 
+    category_id_map: dict[int, int] = {}
     for category_id in sorted(used_category_ids):
         normalized = normalized_class_name(raw_categories[category_id])
-        if normalized not in normalized_names:
-            normalized_names.append(normalized)
         category_id_map[category_id] = normalized_names.index(normalized)
 
     return category_id_map, normalized_names
@@ -141,6 +144,28 @@ def convert_bbox_xywh_to_yolo(bbox: list[float], width: int, height: int) -> tup
     normalized_width = box_width / width
     normalized_height = box_height / height
     return center_x, center_y, normalized_width, normalized_height
+
+
+def sanitize_bbox_xywh(bbox: list[float], width: int, height: int) -> tuple[float, float, float, float] | None:
+    x, y, box_width, box_height = [float(value) for value in bbox]
+    x1 = min(max(x, 0.0), float(width))
+    y1 = min(max(y, 0.0), float(height))
+    x2 = min(max(x + box_width, 0.0), float(width))
+    y2 = min(max(y + box_height, 0.0), float(height))
+    clipped_width = x2 - x1
+    clipped_height = y2 - y1
+    if clipped_width <= 1.0 or clipped_height <= 1.0:
+        return None
+    return x1, y1, clipped_width, clipped_height
+
+
+def sanitize_and_copy_image(source_path: Path, destination_path: Path) -> None:
+    with Image.open(source_path) as image:
+        sanitized = image.convert("RGB") if image.mode not in {"RGB", "L"} else image.copy()
+        if sanitized.mode != "RGB":
+            sanitized = sanitized.convert("RGB")
+        save_kwargs = {"quality": 95} if destination_path.suffix.lower() in {".jpg", ".jpeg"} else {}
+        sanitized.save(destination_path, **save_kwargs)
 
 
 def build_dataset(source_dir: Path, output_dir: Path, train_ratio: float = 0.85, seed: int = 42) -> Path:
@@ -172,6 +197,8 @@ def build_dataset(source_dir: Path, output_dir: Path, train_ratio: float = 0.85,
 
     image_counts_by_split: dict[str, int] = defaultdict(int)
     annotation_counts_by_class: dict[str, int] = defaultdict(int)
+    skipped_annotations = 0
+    missing_images = 0
 
     for split_name, coco, split_dir in split_payloads:
         images_by_id = {
@@ -201,18 +228,29 @@ def build_dataset(source_dir: Path, output_dir: Path, train_ratio: float = 0.85,
             image_path = split_dir / record.file_name
             if image_path.suffix.lower() not in IMAGE_SUFFIXES:
                 continue
+            if not image_path.exists():
+                missing_images += 1
+                continue
 
             destination_image_path = resolved_output / "images" / destination_split / image_path.name
             destination_label_path = resolved_output / "labels" / destination_split / f"{image_path.stem}.txt"
-            shutil.copy2(image_path, destination_image_path)
+            sanitize_and_copy_image(image_path, destination_image_path)
 
             label_lines: list[str] = []
             for annotation in annotations_by_image.get(image_id, []):
                 yolo_class_id = category_id_map[int(annotation["category_id"])]
                 class_name = class_names[yolo_class_id]
+                sanitized_bbox = sanitize_bbox_xywh(
+                    annotation["bbox"],
+                    width=record.width,
+                    height=record.height,
+                )
+                if sanitized_bbox is None:
+                    skipped_annotations += 1
+                    continue
                 annotation_counts_by_class[class_name] += 1
                 center_x, center_y, box_width, box_height = convert_bbox_xywh_to_yolo(
-                    annotation["bbox"],
+                    list(sanitized_bbox),
                     width=record.width,
                     height=record.height,
                 )
@@ -249,6 +287,21 @@ def build_dataset(source_dir: Path, output_dir: Path, train_ratio: float = 0.85,
     print("")
     for class_name in class_names:
         print(f"{class_name}: {annotation_counts_by_class[class_name]} annotations")
+    if missing_images:
+        print(f"missing_images: {missing_images}")
+    if skipped_annotations:
+        print(f"skipped_invalid_annotations: {skipped_annotations}")
+
+    report = {
+        "source_dir": str(resolved_source),
+        "output_dir": str(resolved_output),
+        "class_names": class_names,
+        "image_counts_by_split": dict(image_counts_by_split),
+        "annotation_counts_by_class": dict(annotation_counts_by_class),
+        "missing_images": missing_images,
+        "skipped_invalid_annotations": skipped_annotations,
+    }
+    (resolved_output / "dataset_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     return resolved_output
 
