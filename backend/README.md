@@ -182,6 +182,27 @@ These remain from the earlier async scene-analysis version and are useful for co
 
 `/scan-frame` still accepts optional multipart field `file` and returns fixture detections until YOLO is fully wired.
 
+When a frame is uploaded, `/scan-frame` returns YOLO detections in the uploaded frame coordinate space:
+
+```json
+{
+  "source": "yolo_live",
+  "frame_width": 1280,
+  "frame_height": 720,
+  "objects": [
+    {
+      "name": "plastic_bottle",
+      "confidence": 0.91,
+      "distance": 1.0,
+      "reachable": true,
+      "bbox": { "x": 120, "y": 180, "width": 80, "height": 160 }
+    }
+  ]
+}
+```
+
+The frontend should scale boxes using `frame_width` and `frame_height`. If YOLO/OpenCV is unavailable, the endpoint falls back instead of crashing.
+
 ---
 
 ## Local Checks

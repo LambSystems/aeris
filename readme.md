@@ -169,6 +169,7 @@ The response may take 1-2 seconds when an LLM provider is used, so the UI should
 
 - YOLO detects objects in the camera feed.
 - When confidence is at least 90%, call `POST /sustainability/detect`.
+- Or send sampled frames to `POST /scan-frame` and let the backend return YOLO boxes for the frontend overlay.
 - Expected object classes include `soda_can`, `plastic_bottle`, `cardboard_box`, `cigarette_butt`, `plastic_bag`, `food_wrapper`, `glass_bottle`, and `styrofoam_cup`.
 - The detection schema lives in `backend/app/sustainability/schemas.py`.
 

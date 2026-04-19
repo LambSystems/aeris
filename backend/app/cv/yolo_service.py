@@ -4,11 +4,31 @@ from app.data import load_scene
 from app.schemas import BoundingBox, DynamicContext, SceneObject
 
 
-CANVAS_W, CANVAS_H = 900, 480
 CONF_THRESHOLD = 0.45
 COCO_TO_SUSTAINABILITY: dict[str, str] = {
-    "bottle": "soda_can",
+    "bottle": "plastic_bottle",
     "cup": "styrofoam_cup",
+    "wine glass": "glass_bottle",
+    "vase": "glass_bottle",
+    "bowl": "food_wrapper",
+    "banana": "food_wrapper",
+    "apple": "food_wrapper",
+    "orange": "food_wrapper",
+    "sandwich": "food_wrapper",
+    "book": "cardboard_box",
+    "backpack": "plastic_bag",
+    "handbag": "plastic_bag",
+    "suitcase": "plastic_bag",
+}
+ADVICE_CLASSES = {
+    "soda_can",
+    "plastic_bottle",
+    "cardboard_box",
+    "cigarette_butt",
+    "plastic_bag",
+    "food_wrapper",
+    "glass_bottle",
+    "styrofoam_cup",
 }
 
 _model: Any | None = None
@@ -49,6 +69,8 @@ def scan_frame_from_bytes(image_bytes: bytes) -> DynamicContext:
 
             coco_name = model.names[int(box.cls[0])]
             obj_name = COCO_TO_SUSTAINABILITY.get(coco_name, coco_name)
+            if obj_name not in ADVICE_CLASSES:
+                continue
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             objects.append(
                 SceneObject(
@@ -57,10 +79,10 @@ def scan_frame_from_bytes(image_bytes: bytes) -> DynamicContext:
                     distance=1.0,
                     reachable=True,
                     bbox=BoundingBox(
-                        x=round(x1 / w * CANVAS_W, 1),
-                        y=round(y1 / h * CANVAS_H, 1),
-                        width=round((x2 - x1) / w * CANVAS_W, 1),
-                        height=round((y2 - y1) / h * CANVAS_H, 1),
+                        x=round(x1, 1),
+                        y=round(y1, 1),
+                        width=round(x2 - x1, 1),
+                        height=round(y2 - y1, 1),
                     ),
                 )
             )
@@ -68,8 +90,8 @@ def scan_frame_from_bytes(image_bytes: bytes) -> DynamicContext:
         return DynamicContext(
             objects=objects,
             source="yolo_live",
-            frame_width=CANVAS_W,
-            frame_height=CANVAS_H,
+            frame_width=w,
+            frame_height=h,
         )
     except Exception:
         return scan_demo_frame().model_copy(update={"source": "yolo_unavailable_fallback"})
