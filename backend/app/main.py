@@ -27,6 +27,8 @@ from app.schemas import (
 )
 from app.sustainability.adviser import get_sustainability_advice
 from app.sustainability.schemas import DetectionRequest, SustainabilityAdvice
+from app.sustainability.schemas import YOLODetection
+from app.vision_state import read_latest_detection
 
 
 app = FastAPI(
@@ -145,3 +147,8 @@ def sustainability_detect(request: DetectionRequest) -> SustainabilityAdvice:
         castnet=fixed_context.castnet,
         fixed_context=fixed_context,
     )
+
+
+@app.get("/vision/latest-detection", response_model=YOLODetection | None)
+def latest_vision_detection() -> YOLODetection | None:
+    return read_latest_detection()

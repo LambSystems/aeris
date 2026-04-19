@@ -89,3 +89,11 @@ export interface SustainabilityResponse {
   castnet_site?: string;
   decision_source?: string;
 }
+
+export interface VisionDetection {
+  object_class: string;
+  confidence: number;
+  bbox?: BBox | null;
+  frame_id: string;
+  timestamp: string;
+}

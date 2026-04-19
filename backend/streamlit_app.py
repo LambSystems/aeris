@@ -22,11 +22,14 @@ from app.cv.pipeline import COCO_TO_SUSTAINABILITY, _draw_advice, _draw_box
 from app.sustainability.adviser import get_sustainability_advice
 from app.sustainability.castnet_service import load_castnet
 from app.sustainability.schemas import SustainabilityAdvice, YOLODetection
+from app.vision_state import write_latest_detection
 
 COOLDOWN_SECONDS = 10
 DEFAULT_CONFIDENCE_THRESHOLD = 0.70
-DEFAULT_FRAME_SKIP = 1
-DEFAULT_INFERENCE_SIZE = 320
+DEFAULT_FRAME_SKIP = int(os.getenv("YOLO_FRAME_SKIP", "1"))
+DEFAULT_INFERENCE_SIZE = int(os.getenv("YOLO_IMGSZ", "320"))
+DEFAULT_CAMERA_WIDTH = int(os.getenv("AERIS_CAMERA_WIDTH", "960"))
+DEFAULT_CAMERA_HEIGHT = int(os.getenv("AERIS_CAMERA_HEIGHT", "540"))
 MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "yolov8n.pt")
 MODEL_NAME = Path(MODEL_PATH).name
 EMBED_MODE = os.getenv("AERIS_STREAMLIT_EMBED") == "1"
@@ -38,18 +41,90 @@ if EMBED_MODE:
     st.markdown(
         """
         <style>
-          header, footer, [data-testid="stSidebar"], [data-testid="stToolbar"] {
+          :root {
+            --aeris-background: hsl(40 20% 98%);
+            --aeris-card: hsl(0 0% 100%);
+            --aeris-foreground: hsl(215 25% 15%);
+            --aeris-muted: hsl(215 15% 45%);
+            --aeris-border: hsl(215 20% 90%);
+            --aeris-primary: hsl(152 45% 36%);
+            --aeris-primary-soft: hsl(152 40% 94%);
+            --aeris-danger: hsl(0 70% 48%);
+          }
+          html,
+          body,
+          .stApp,
+          [data-testid="stAppViewContainer"],
+          [data-testid="stMain"],
+          [data-testid="stMainBlockContainer"] {
+            background: var(--aeris-card) !important;
+            overflow: hidden !important;
+          }
+          header,
+          footer,
+          [data-testid="stSidebar"],
+          [data-testid="stToolbar"],
+          [data-testid="stDecoration"],
+          [data-testid="stStatusWidget"],
+          #MainMenu {
             display: none !important;
           }
+          * {
+            scrollbar-width: none !important;
+          }
+          *::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+          }
           .block-container {
-            padding: 0.35rem 0.5rem 0.5rem !important;
+            padding: 0 !important;
             max-width: 100% !important;
           }
+          section.main > div {
+            padding: 0 !important;
+          }
           [data-testid="stVerticalBlock"] {
-            gap: 0.35rem !important;
+            gap: 0 !important;
+          }
+          .stElementContainer,
+          .element-container {
+            margin: 0 !important;
+          }
+          div[data-testid="stVideo"] video,
+          video {
+            display: block !important;
+            width: 100% !important;
+            border-radius: 0.5rem !important;
+            background: hsl(215 28% 9%) !important;
           }
           iframe {
-            border-radius: 12px;
+            border-radius: 0.5rem !important;
+            border: 0 !important;
+          }
+          .stButton {
+            margin: 0.5rem 0 0 !important;
+          }
+          .stButton > button {
+            min-height: 2.25rem !important;
+            padding: 0.45rem 0.9rem !important;
+            border-radius: 0.5rem !important;
+            border: 1px solid var(--aeris-border) !important;
+            background: var(--aeris-card) !important;
+            color: var(--aeris-foreground) !important;
+            box-shadow: none !important;
+            font-weight: 600 !important;
+            letter-spacing: 0 !important;
+            transition:
+              background-color 140ms ease,
+              border-color 140ms ease,
+              color 140ms ease !important;
+          }
+          .stButton > button:hover,
+          .stButton > button:focus {
+            border-color: hsl(152 28% 72%) !important;
+            background: var(--aeris-primary-soft) !important;
+            color: var(--aeris-primary) !important;
           }
         </style>
         """,
@@ -186,6 +261,7 @@ class AerisProcessor(VideoTransformerBase):
                     frame_id=f"frame_{self._frame_count:05d}",
                     timestamp=datetime.now().isoformat(timespec="seconds") + "Z",
                 )
+                write_latest_detection(detection)
                 threading.Thread(target=self._fetch_advice, args=(detection,), daemon=True).start()
 
         with self._lock:
@@ -215,8 +291,8 @@ ctx = webrtc_streamer(
     rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
     media_stream_constraints={
         "video": {
-            "width": {"ideal": 1280},
-            "height": {"ideal": 720},
+            "width": {"ideal": DEFAULT_CAMERA_WIDTH},
+            "height": {"ideal": DEFAULT_CAMERA_HEIGHT},
             "frameRate": {"ideal": 30, "max": 30},
         },
         "audio": False,

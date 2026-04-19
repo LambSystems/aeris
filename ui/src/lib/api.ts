@@ -3,6 +3,7 @@ import type {
   ScanFrameResponse,
   SustainabilityRequest,
   SustainabilityResponse,
+  VisionDetection,
 } from "./types";
 
 const DEFAULT_API_BASE =
@@ -59,4 +60,8 @@ export async function detectSustainability(
   payload: SustainabilityRequest,
 ): Promise<SustainabilityResponse> {
   return postJson<SustainabilityResponse>("/sustainability/detect", payload);
+}
+
+export async function getLatestVisionDetection(): Promise<VisionDetection | null> {
+  return getJson<VisionDetection | null>("/vision/latest-detection");
 }

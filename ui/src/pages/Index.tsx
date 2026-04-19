@@ -4,11 +4,12 @@ import { DecisionPanel } from "@/components/aeris/DecisionPanel";
 import { StatusChip } from "@/components/aeris/StatusChip";
 import { Button } from "@/components/ui/button";
 import { useCameraScanner } from "@/hooks/useCameraScanner";
-import { detectSustainability, getFixedContext } from "@/lib/api";
+import { detectSustainability, getFixedContext, getLatestVisionDetection } from "@/lib/api";
 import type {
   DetectedObject,
   FixedContextResponse,
   SustainabilityResponse,
+  VisionDetection,
 } from "@/lib/types";
 import { formatObjectName } from "@/lib/format";
 import {
@@ -18,6 +19,7 @@ import {
   Wifi,
   WifiOff,
   MapPin,
+  ExternalLink,
 } from "lucide-react";
 
 // Default coords match backend example (Bondville, IL area).
@@ -255,6 +257,7 @@ const StreamlitEmbedPage = () => {
     lat: DEFAULT_LAT,
     lng: DEFAULT_LNG,
   });
+  const [streamlitDetection, setStreamlitDetection] = useState<VisionDetection | null>(null);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
@@ -287,6 +290,67 @@ const StreamlitEmbedPage = () => {
       cancelled = true;
     };
   }, [coords.lat, coords.lng]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pollDetection = () => {
+      getLatestVisionDetection()
+        .then((detection) => {
+          if (!cancelled) setStreamlitDetection(detection);
+        })
+        .catch(() => {});
+    };
+
+    pollDetection();
+    const timer = window.setInterval(pollDetection, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const primaryObject: DetectedObject | null = useMemo(() => {
+    if (!streamlitDetection) return null;
+    return {
+      name: streamlitDetection.object_class,
+      confidence: streamlitDetection.confidence,
+      bbox: streamlitDetection.bbox ?? { x: 0, y: 0, width: 0, height: 0 },
+    };
+  }, [streamlitDetection]);
+
+  const [recommendation, setRecommendation] =
+    useState<SustainabilityResponse | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
+  const [recUpdating, setRecUpdating] = useState(false);
+  const lastDetectionKeyRef = useRef<string>("");
+
+  useEffect(() => {
+    if (!streamlitDetection) return;
+    const key = `${streamlitDetection.object_class}:${streamlitDetection.frame_id}`;
+    if (key === lastDetectionKeyRef.current) return;
+    lastDetectionKeyRef.current = key;
+
+    if (recommendation) setRecUpdating(true);
+    else setRecLoading(true);
+
+    detectSustainability({
+      latitude: coords.lat,
+      longitude: coords.lng,
+      detection: {
+        object_class: streamlitDetection.object_class,
+        confidence: streamlitDetection.confidence,
+        frame_id: streamlitDetection.frame_id,
+        timestamp: streamlitDetection.timestamp,
+        bbox: streamlitDetection.bbox ?? { x: 0, y: 0, width: 0, height: 0 },
+      },
+    })
+      .then((r) => setRecommendation(r))
+      .catch(() => {})
+      .finally(() => {
+        setRecLoading(false);
+        setRecUpdating(false);
+      });
+  }, [coords.lat, coords.lng, recommendation, streamlitDetection]);
 
   const sceneMode: "indoor" | "outdoor" =
     context?.weather_alerts && context.weather_alerts.length > 0
@@ -326,38 +390,40 @@ const StreamlitEmbedPage = () => {
 
       <main className="container grid gap-4 py-4 lg:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)] lg:gap-6 lg:py-6">
         <section className="flex flex-col gap-3">
-          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border bg-foreground/95 shadow-[0_1px_0_hsl(var(--border)),0_24px_60px_-30px_hsl(var(--foreground)/0.35)]">
-            <iframe
-              src={STREAMLIT_URL}
-              title="Aeris Streamlit YOLO"
-              className="h-full w-full border-0"
-              allow="camera; microphone; autoplay; fullscreen"
-            />
+          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border bg-card p-2 shadow-[0_1px_0_hsl(var(--border)),0_22px_55px_-34px_hsl(var(--foreground)/0.28)]">
+            <div className="h-full w-full overflow-hidden rounded-lg bg-muted">
+              <iframe
+                src={STREAMLIT_URL}
+                title="Aeris Streamlit YOLO"
+                className="h-full w-full border-0 bg-card"
+                allow="camera; microphone; autoplay; fullscreen"
+                scrolling="no"
+              />
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-2.5">
             <div className="flex items-center gap-2 text-sm">
               <span className="h-2 w-2 rounded-full bg-primary animate-pulse-soft" />
-              <span className="text-foreground">YOLO stream rendered by Streamlit</span>
+              <span className="text-foreground">Live YOLO stream</span>
+              <span className="text-xs text-muted-foreground">GPU accelerated via Streamlit</span>
             </div>
-            <a
-              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-              href={STREAMLIT_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open stream
-            </a>
+            <Button variant="outline" size="sm" asChild>
+              <a href={STREAMLIT_URL} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open stream
+              </a>
+            </Button>
           </div>
         </section>
 
         <DecisionPanel
-          primaryObject={null}
+          primaryObject={primaryObject}
           context={context}
           contextLoading={contextLoading}
           contextError={contextError}
-          recommendation={null}
-          recommendationLoading={false}
-          recommendationUpdating={false}
+          recommendation={recommendation}
+          recommendationLoading={recLoading}
+          recommendationUpdating={recUpdating}
           sceneMode={sceneMode}
         />
       </main>
