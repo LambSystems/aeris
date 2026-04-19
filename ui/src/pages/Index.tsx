@@ -23,8 +23,15 @@ import {
 // Default coords match backend example (Bondville, IL area).
 const DEFAULT_LAT = 40.9478;
 const DEFAULT_LNG = -90.3712;
+const USE_STREAMLIT_EMBED = import.meta.env.VITE_VISION_PROVIDER === "streamlit-embed";
+const STREAMLIT_URL = import.meta.env.VITE_STREAMLIT_URL ?? "http://localhost:8501";
 
 const Index = () => {
+  if (USE_STREAMLIT_EMBED) return <StreamlitEmbedPage />;
+  return <LiveScannerPage />;
+};
+
+const LiveScannerPage = () => {
   const [scanning, setScanning] = useState(true);
   const [coords, setCoords] = useState<{ lat: number; lng: number }>({
     lat: DEFAULT_LAT,
@@ -236,6 +243,121 @@ const Index = () => {
           recommendation={recommendation}
           recommendationLoading={recLoading}
           recommendationUpdating={recUpdating}
+          sceneMode={sceneMode}
+        />
+      </main>
+    </div>
+  );
+};
+
+const StreamlitEmbedPage = () => {
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
+    lat: DEFAULT_LAT,
+    lng: DEFAULT_LNG,
+  });
+
+  useEffect(() => {
+    if (!("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { timeout: 4000, maximumAge: 60_000 },
+    );
+  }, []);
+
+  const [context, setContext] = useState<FixedContextResponse | null>(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [contextError, setContextError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setContextLoading(true);
+    setContextError(null);
+    getFixedContext(coords.lat, coords.lng)
+      .then((ctx) => {
+        if (!cancelled) setContext(ctx);
+      })
+      .catch(() => {
+        if (!cancelled) setContextError("context_failed");
+      })
+      .finally(() => {
+        if (!cancelled) setContextLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coords.lat, coords.lng]);
+
+  const sceneMode: "indoor" | "outdoor" =
+    context?.weather_alerts && context.weather_alerts.length > 0
+      ? "outdoor"
+      : (context?.weather?.wind_speed_kmh ?? 0) > 5
+        ? "outdoor"
+        : "indoor";
+
+  const locationLabel =
+    context?.castnet?.location ??
+    context?.location?.name ??
+    `${coords.lat.toFixed(2)}, ${coords.lng.toFixed(2)}`;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card/60 backdrop-blur">
+        <div className="container flex flex-wrap items-center gap-3 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Leaf className="h-4 w-4" strokeWidth={2.25} />
+            </div>
+            <div className="leading-tight">
+              <h1 className="text-base font-semibold tracking-tight">Aeris</h1>
+              <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                Environmental scanner
+              </p>
+            </div>
+          </div>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <StatusChip tone="primary" label="Streamlit vision" icon={Wifi} />
+            <StatusChip tone="accent" label={locationLabel} icon={MapPin} />
+            <StatusChip tone="primary" label="Live scan" pulse />
+            <StatusChip tone="primary" label="Embedded YOLO" />
+          </div>
+        </div>
+      </header>
+
+      <main className="container grid gap-4 py-4 lg:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)] lg:gap-6 lg:py-6">
+        <section className="flex flex-col gap-3">
+          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border bg-foreground/95 shadow-[0_1px_0_hsl(var(--border)),0_24px_60px_-30px_hsl(var(--foreground)/0.35)]">
+            <iframe
+              src={STREAMLIT_URL}
+              title="Aeris Streamlit YOLO"
+              className="h-full w-full border-0"
+              allow="camera; microphone; autoplay; fullscreen"
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-2.5">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse-soft" />
+              <span className="text-foreground">YOLO stream rendered by Streamlit</span>
+            </div>
+            <a
+              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              href={STREAMLIT_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open stream
+            </a>
+          </div>
+        </section>
+
+        <DecisionPanel
+          primaryObject={null}
+          context={context}
+          contextLoading={contextLoading}
+          contextError={contextError}
+          recommendation={null}
+          recommendationLoading={false}
+          recommendationUpdating={false}
           sceneMode={sceneMode}
         />
       </main>

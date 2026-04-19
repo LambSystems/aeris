@@ -20,10 +20,14 @@ from app.sustainability.schemas import SustainabilityAdvice, YOLODetection
 CONFIDENCE_THRESHOLD = 0.70
 COOLDOWN_SECONDS = 10
 
-# Maps COCO class names → our sustainability object classes
+# Maps detector class names to our sustainability object classes.
 COCO_TO_SUSTAINABILITY: dict[str, str] = {
-    "bottle": "soda_can",
-    "cup": "styrofoam_cup",
+    "bottle": "plastic_bottle",
+    "can": "aluminum_can",
+    "paper": "paper",
+    "cup": "paper",
+    "soda_can": "aluminum_can",
+    "aluminum_can": "aluminum_can",
 }
 
 
