@@ -234,10 +234,10 @@ npm run build
 
 ## Team Contributions
 
-- Piero Postigo / @postigodev: FastAPI layer, environmental context integration, recommendation pipeline, LLM/fallback/cache orchestration, and glue between Streamlit/YOLO detections and the rest of the system.
-- Shuja Waraich / @shuja-waraich-03: AI integration, real-time synchronization between vision and reasoning, Gemini prompt structure, and live detection validation.
-- Chau Tran / @kacytran1122: Frontend work, React camera detection, landing page, responsive interaction design, and user experience polish.
-- Galgallo Roba Waqo / @GALGALLOR: Computer vision pipeline, dataset preparation, YOLO fine-tuning, real-time inference performance, and Streamlit integration.
+- [@postigodev](https://github.com/postigodev): FastAPI layer, environmental context integration, recommendation pipeline, LLM/fallback/cache orchestration, and glue between Streamlit/YOLO detections and the rest of the system.
+- [@shuja-waraich-03](https://github.com/shuja-waraich-03): AI integration, real-time synchronization between vision and reasoning, Gemini prompt structure, and live detection validation.
+- [@kacytran1122](https://github.com/kacytran1122): Frontend work, React camera detection, landing page, responsive interaction design, and user experience polish.
+- [@GALGALLOR](https://github.com/GALGALLOR): Computer vision pipeline, dataset preparation, YOLO fine-tuning, real-time inference performance, and Streamlit integration.
 
 ## Portfolio Notes
 
