@@ -1,5 +1,7 @@
 # Aeris
 
+[![CI](https://github.com/LambSystems/aeris/actions/workflows/ci.yml/badge.svg)](https://github.com/LambSystems/aeris/actions/workflows/ci.yml)
+
 Aeris is a real-time environmental intelligence system built for HackAugie, where it won Best Data Insight. It detects visible waste, normalizes local environmental context, and returns a practical sustainability recommendation that still works when LLM providers are unavailable.
 
 **Winner: HackAugie Best Data Insight**
@@ -10,6 +12,7 @@ Aeris is not production recycling infrastructure. The portfolio signal is the sy
 - Demo video: https://www.youtube.com/watch?v=41eoB-4JUbs
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - Local dev setup: [docs/local-dev-setup.md](docs/local-dev-setup.md)
+- License: [MIT](LICENSE)
 
 ## Review Paths
 
