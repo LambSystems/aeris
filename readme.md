@@ -2,9 +2,23 @@
 
 Aeris is a real-time environmental intelligence system built for HackAugie, where it won Best Data Insight. It detects visible waste, normalizes local environmental context, and returns a practical sustainability recommendation that still works when LLM providers are unavailable.
 
+Aeris is not production recycling infrastructure. The portfolio signal is the system design: a clear boundary between vision detections, environmental context, LLM-backed advice, deterministic fallback behavior, and cache-aware backend orchestration.
+
 - Devpost: https://devpost.com/software/aeris-the-environmental-intelligence-system
 - Demo video: https://www.youtube.com/watch?v=41eoB-4JUbs
+- Architecture: [docs/architecture.md](docs/architecture.md)
+- Readiness audit: [docs/system-audit.md](docs/system-audit.md)
 - Primary portfolio angle: backend orchestration across vision, environmental data, LLM advice, fallback policy, and caching
+
+## Review Paths
+
+| If you are... | Start here |
+| --- | --- |
+| A recruiter or portfolio reviewer | This README, the demo video, and [docs/system-audit.md](docs/system-audit.md) |
+| An engineer reviewing the system | [docs/architecture.md](docs/architecture.md), [docs/yolo-integration.md](docs/yolo-integration.md), and [tests/](tests/) |
+| Trying to run it locally | The Quick Start below, then `python -m unittest discover -s tests` |
+| Looking for model training context | [docs/trash-model.md](docs/trash-model.md) and `backend/scripts/` |
+| Looking for hackathon provenance | [docs/hackaton-context.md](docs/hackaton-context.md) and `archive/legacy-ui/` |
 
 ## What It Does
 
@@ -41,6 +55,13 @@ The environmental context layer combines:
 - weather.gov alerts
 - derived risk flags
 
+## Deterministic vs AI-Assisted
+
+- Deterministic: environmental context normalization, risk flags, API contracts, cache behavior, and fallback recommendation policy.
+- Model-based: YOLO waste detection for cans, paper, and bottles.
+- AI-assisted: Gemini or Anthropic recommendation wording when provider keys are configured.
+- Bounded: the LLM does not own object detection, environmental measurements, risk flags, or fallback behavior.
+
 ## System Boundary
 
 Aeris is intentionally split into three boundaries:
@@ -72,6 +93,10 @@ ui/
 data/
   castnet/processed/                  Demo CASTNET profiles/readings
   sample_inputs/                      Demo scene fixtures
+
+tests/                                Backend API and policy tests
+scripts/                              Root-level backend smoke and data utilities
+assets/                               Demo/reference assets
 
 docs/
   architecture.md                     Current system design
@@ -199,6 +224,13 @@ cd ui
 npm run test
 npm run build
 ```
+
+## Hackathon Tradeoffs
+
+- Streamlit remains the primary live scanner because it was the fastest reliable way to connect camera input, YOLO inference, and backend recommendations during the hackathon.
+- Model checkpoints are local artifacts and are intentionally gitignored; the documented path is `backend/models/trash-quick-v4-best.pt`.
+- Legacy UI experiments are kept under `archive/legacy-ui/` for provenance, but the maintained demo paths are `backend/streamlit_app.py` and `ui/`.
+- The recommendation layer favors a small, inspectable fallback path over broad autonomous-agent behavior.
 
 ## Team Contributions
 
