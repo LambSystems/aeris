@@ -1,4 +1,18 @@
-# Aeris Frontend
+# Aeris Frontend (Legacy Experiment)
+
+This folder is an earlier Vite/React demo path kept for project history. It is not the maintained portfolio runtime.
+
+Use these paths instead:
+
+- Primary live app: `backend/streamlit_app.py`
+- Backend/API: `backend/app/`
+- Optional maintained React shell: `ui/`
+
+The notes below describe the older experiment and are kept only for provenance.
+
+---
+
+# Original Notes
 
 Vite + React demo interface for Aeris.
 
