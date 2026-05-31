@@ -1,100 +1,67 @@
 # Architecture
 
-## Current Demo Architecture
+## Current Shape
 
-Aeris currently uses a split live-vision architecture:
+Aeris is currently Streamlit-first, with FastAPI as the context/recommendation backbone and React as an optional product shell.
 
 ```text
-React product shell
-  -> polished UI, sidebar, context, recommendation
-
-Streamlit vision iframe
-  -> camera access, YOLO inference, bounding boxes
+Streamlit live scanner
+  -> camera or uploaded clip
+  -> local YOLO checkpoint
+  -> visible boxes and labels
+  -> latest structured detection
+  -> side-panel advice
 
 FastAPI backend
-  -> fixed context, latest detection bridge, advice generation
+  -> fixed environmental context
+  -> image scan endpoint
+  -> latest detection bridge
+  -> LLM/fallback recommendation endpoint
+
+Optional React shell
+  -> embeds Streamlit
+  -> polls FastAPI
+  -> renders a polished operations-console view
 ```
 
-This is the stable hackathon demo path. It keeps YOLO running in the Python/GPU environment while preserving the more polished Lovable/React interface.
+This is different from a pure React camera app. YOLO remains in Python because that path was more reliable for a hackathon demo and is still the clearest portfolio architecture for the project.
 
----
+## Core Boundary
 
-## Why This Shape
+The system boundary to preserve is:
 
-We tested three viable paths:
+```text
+Vision produces structured detections.
+Backend normalizes environmental context.
+Recommendation layer consumes detection + context, not raw video.
+```
 
-1. **React + backend YOLO polling**
-   - Good integration.
-   - Less smooth visually because frames travel through HTTP.
-
-2. **React + browser YOLO ONNX**
-   - Cleanest architecture.
-   - Too sticky on this machine because ONNX Runtime Web was effectively WASM/CPU-bound.
-
-3. **React + Streamlit YOLO iframe**
-   - Best live YOLO performance locally.
-   - Slightly less native visually.
-   - Current chosen demo path.
-
-The current priority is demo reliability and smooth-enough real-time perception.
-
----
+That keeps the recommendation path small, testable, cacheable, and resilient.
 
 ## Runtime Flow
 
 ```text
-Camera
-  -> Streamlit WebRTC
-  -> YOLO .pt model
-  -> detection threshold / class normalization
-  -> boxes drawn in Streamlit video
-  -> latest actionable detection written to .tmp/vision/latest_detection.json
-
-React
-  -> embeds Streamlit iframe
-  -> polls GET /vision/latest-detection
-  -> renders Current Scan
-  -> calls POST /sustainability/detect
-  -> renders Recommendation
-
-FastAPI
-  -> loads fixed context through GET /context/fixed
-  -> reads latest detection bridge file
-  -> generates advice with LLM/cache/fallback
+Camera frame
+  -> streamlit-webrtc
+  -> Ultralytics YOLO
+  -> detection threshold / label normalization
+  -> bounding boxes drawn in Streamlit
+  -> YOLODetection written to .tmp/vision/latest_detection.json
+  -> advice request for object + CASTNET context
+  -> cached LLM-backed advice or deterministic fallback
 ```
 
----
+The optional React shell can poll:
+
+```text
+GET /vision/latest-detection
+POST /sustainability/detect
+GET /context/fixed
+```
 
 ## Components
 
-### React UI
-
-Location:
-
-```text
-ui/
-```
-
-Responsibilities:
-
-- render the demo product shell
-- embed Streamlit at `VITE_STREAMLIT_URL`
-- show current scan state
-- show environmental context
-- show recommendation
-- poll backend, not LLM providers
-
-Important file:
-
-```text
-ui/src/pages/Index.tsx
-```
-
-When `VITE_VISION_PROVIDER=streamlit-embed`, the UI uses `StreamlitEmbedPage`.
-
----
-
-### Streamlit YOLO
+### Streamlit Scanner
 
 Location:
 
@@ -104,57 +71,23 @@ backend/streamlit_app.py
 
 Responsibilities:
 
-- request camera access
-- run YOLO on frames
-- draw bounding boxes
-- filter actionable detections
-- publish the latest detection for React/FastAPI
+- request camera access through `streamlit-webrtc`
+- load the configured YOLO checkpoint
+- run live tracking or uploaded-clip processing
+- draw detections directly on the video
+- publish the latest actionable detection
+- show current scan, environmental context, risk signals, and advice
 
-Config:
+Important runtime knobs:
 
 ```powershell
-$env:AERIS_STREAMLIT_EMBED="1"
-$env:YOLO_MODEL_PATH="C:\Users\akuma\repos\aeris\backend\models\trash-quick-v4-best.pt"
-$env:YOLO_DEVICE="0"
-$env:AERIS_CAMERA_WIDTH="960"
-$env:AERIS_CAMERA_HEIGHT="540"
-$env:YOLO_FRAME_SKIP="1"
+$env:YOLO_MODEL_PATH="backend\models\trash-quick-v4-best.pt"
 $env:YOLO_IMGSZ="320"
+$env:YOLO_FRAME_SKIP="2"
+$env:YOLO_DEVICE="0"
+$env:AERIS_CAMERA_WIDTH="640"
+$env:AERIS_CAMERA_HEIGHT="360"
 ```
-
-The Streamlit app should not own the polished recommendation UI in embed mode. It only owns live vision.
-
----
-
-### Vision Bridge
-
-Location:
-
-```text
-backend/app/vision_state.py
-```
-
-Purpose:
-
-```text
-Streamlit process -> local JSON file -> FastAPI endpoint -> React
-```
-
-File:
-
-```text
-.tmp/vision/latest_detection.json
-```
-
-Endpoint:
-
-```text
-GET /vision/latest-detection
-```
-
-This is intentionally simple. It avoids introducing Redis/WebSockets during the hackathon.
-
----
 
 ### FastAPI Backend
 
@@ -181,29 +114,26 @@ Responsibilities:
 - generate sustainability advice
 - keep deterministic fallback working
 - cache repeated advice
+- support image-scan and older async demo paths
 
----
+### Environmental Context
 
-### Fixed Context
+Location:
 
-Fixed context combines:
+```text
+backend/app/context/
+```
 
-- browser GPS or default coordinates
-- nearest CASTNET reading
+`load_fixed_context()` combines:
+
+- default or browser-provided coordinates
+- processed CASTNET reading
 - Open-Meteo weather
 - Open-Meteo air quality
 - weather.gov alerts
 - local risk flags
 
-Endpoint:
-
-```text
-GET /context/fixed?latitude=40.9478&longitude=-90.3712
-```
-
-The UI should keep this visible because it proves the dataset is active.
-
----
+This layer returns an `EnvironmentalFixedContext` with `source_status` values so the UI can show when a source is live versus fallback.
 
 ### Advice Layer
 
@@ -213,40 +143,47 @@ Location:
 backend/app/sustainability/adviser.py
 ```
 
-Provider order:
+Provider behavior:
 
-1. Gemini
-2. Anthropic
-3. deterministic fallback
-
-The advice layer receives structured data only:
-
-- detected object class
-- confidence
-- optional bbox
-- fixed context
-- CASTNET reading
-
-It does not process raw video.
+```text
+AERIS_LLM_PROVIDER=gemini     -> Gemini only, then fallback
+AERIS_LLM_PROVIDER=anthropic  -> Anthropic only, then fallback
+AERIS_LLM_PROVIDER=auto       -> Gemini, Anthropic, then fallback
+```
 
 The cache key includes:
 
-- object class
-- CASTNET site
-- measurement date
+- detected object class
+- CASTNET site id
+- CASTNET measurement date
 - risk flags
 
-This prevents repeated LLM calls for the same demo state.
+That prevents repeated model calls for the same object/context state.
 
----
+### Optional React UI
+
+Location:
+
+```text
+ui/
+```
+
+The Vite UI can:
+
+- embed Streamlit with `VITE_VISION_PROVIDER=streamlit-embed`
+- poll the latest Streamlit detection
+- render context and recommendation panels
+- exercise experimental browser/backend YOLO paths
+
+This is useful for a polished portfolio shell, but the Streamlit app is the primary working runtime.
 
 ## Data Contracts
 
-### Latest Detection
+### Detection
 
 ```json
 {
-  "object_class": "aluminum_can",
+  "object_class": "can",
   "confidence": 0.84,
   "bbox": null,
   "frame_id": "frame_00123",
@@ -261,8 +198,8 @@ This prevents repeated LLM calls for the same demo state.
   "location": {
     "latitude": 40.9478,
     "longitude": -90.3712,
-    "label": "40.9478,-90.3712",
-    "source": "browser_gps"
+    "label": "Galesburg, IL",
+    "source": "default_demo_location"
   },
   "castnet": {
     "site_id": "BVL130",
@@ -273,7 +210,7 @@ This prevents repeated LLM calls for the same demo state.
     "co_ppb": 41.72,
     "measurement_date": "2026-04-15"
   },
-  "risk_flags": ["castnet_elevated_nitrate", "weather_alert_active"],
+  "risk_flags": ["castnet_elevated_nitrate"],
   "summary": "Nearest CASTNET context is Bondville, IL..."
 }
 ```
@@ -282,57 +219,27 @@ This prevents repeated LLM calls for the same demo state.
 
 ```json
 {
-  "object_detected": "aluminum_can",
+  "object_detected": "can",
   "confidence": 0.84,
-  "context": "An aluminum can was detected...",
+  "context": "A can was detected...",
   "action": "Place it in the nearest recycling bin...",
   "environment_summary": "Nearest CASTNET context is Bondville, IL...",
-  "risk_flags": ["castnet_elevated_nitrate", "weather_alert_active"],
+  "risk_flags": ["castnet_elevated_nitrate"],
   "castnet_site": "Bondville, IL",
   "decision_source": "llm_gemini"
 }
 ```
 
----
+## Failure Model
 
-## Performance Model
+If weather or air-quality APIs fail, `source_status` records fallback/error status and the app still uses CASTNET context.
 
-Real-time perception and advice run at different speeds:
+If LLM providers fail or keys are missing, `deterministic_fallback` still returns a recommendation.
 
-```text
-YOLO/video: fast path, visible immediately in iframe
-Advice: event-based path, cached, may take 1-3 seconds on first LLM call
-Fixed context: loaded once per coordinate/session
-```
+If the Streamlit detection bridge fails, test `/vision/latest-detection` and use `/sustainability/detect` manually for a demo fallback.
 
-We do not call an LLM on every frame.
+If live inference is slow, lower camera size, increase `YOLO_FRAME_SKIP`, and keep `YOLO_IMGSZ=320`.
 
----
+## One-Sentence Summary
 
-## Fallbacks
-
-If YOLO/Streamlit is slow:
-
-- reduce camera resolution
-- increase `YOLO_FRAME_SKIP`
-- keep `YOLO_IMGSZ=320`
-
-If LLM fails:
-
-- deterministic fallback still returns advice
-
-If Streamlit detection bridge fails:
-
-- test `/vision/latest-detection`
-- use `/sustainability/detect` manually for the pitch
-
-If browser YOLO becomes necessary:
-
-- see `docs/yolo-browser.md`
-- treat it as experimental unless performance improves
-
----
-
-## One-Sentence Architecture Summary
-
-**Aeris embeds Python/GPU YOLO for live vision inside a React product shell, then uses FastAPI to combine latest detections with CASTNET/weather context and cached LLM-backed sustainability advice.**
+Aeris keeps live perception in the Python vision layer, normalizes environmental context in FastAPI, and turns structured detections into cached, fallback-safe sustainability recommendations.
