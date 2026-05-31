@@ -1,0 +1,3 @@
+# Keep archived hackathon UI experiments available for provenance without
+# letting them distort GitHub's language breakdown for the maintained system.
+archive/legacy-ui/** linguist-vendored
