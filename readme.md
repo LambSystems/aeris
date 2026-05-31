@@ -8,8 +8,8 @@ Aeris is a real-time environmental intelligence system built for HackAugie, wher
 
 Aeris is not production recycling infrastructure. The portfolio signal is the system design: a clear boundary between vision detections, environmental context, LLM-backed advice, deterministic fallback behavior, and cache-aware backend orchestration.
 
-- Devpost: https://devpost.com/software/aeris-the-environmental-intelligence-system
-- Demo video: https://www.youtube.com/watch?v=41eoB-4JUbs
+- Hackaton Submission: [Devpost](https://devpost.com/software/aeris-the-environmental-intelligence-system)
+- Demo video: [Youtube](https://www.youtube.com/watch?v=41eoB-4JUbs)
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - Local dev setup: [docs/local-dev-setup.md](docs/local-dev-setup.md)
 - License: [MIT](LICENSE)
