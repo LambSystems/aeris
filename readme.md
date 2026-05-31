@@ -2,10 +2,14 @@
 
 Aeris is a real-time environmental intelligence system built for HackAugie, where it won Best Data Insight. It detects visible waste, normalizes local environmental context, and returns a practical sustainability recommendation that still works when LLM providers are unavailable.
 
+**Winner: HackAugie Best Data Insight**
+
+Aeris is not production recycling infrastructure. The portfolio signal is the system design: a clear boundary between vision detections, environmental context, LLM-backed advice, deterministic fallback behavior, and cache-aware backend orchestration.
+
 - Devpost: https://devpost.com/software/aeris-the-environmental-intelligence-system
 - Demo video: https://www.youtube.com/watch?v=41eoB-4JUbs
 - Architecture: [docs/architecture.md](docs/architecture.md)
-
+- Local dev setup: [docs/local-dev-setup.md](docs/local-dev-setup.md)
 
 ## Review Paths
 
@@ -13,7 +17,7 @@ Aeris is a real-time environmental intelligence system built for HackAugie, wher
 | --- | --- |
 | A recruiter or portfolio reviewer | This README, the demo video, and [docs/system-audit.md](docs/system-audit.md) |
 | An engineer reviewing the system | [docs/architecture.md](docs/architecture.md), [docs/yolo-integration.md](docs/yolo-integration.md), and [tests/](tests/) |
-| Trying to run it locally | The Quick Start below, then `python -m unittest discover -s tests` |
+| Trying to run it locally | `powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1`, then [docs/local-dev-setup.md](docs/local-dev-setup.md) |
 | Looking for model training context | [docs/trash-model.md](docs/trash-model.md) and `backend/scripts/` |
 | Looking for hackathon provenance | [docs/hackaton-context.md](docs/hackaton-context.md) and `archive/legacy-ui/` |
 
@@ -109,6 +113,14 @@ archive/legacy-ui/
 Earlier UI experiments are archived under `archive/legacy-ui/` for provenance. The current maintained UI paths are `backend/streamlit_app.py` and, optionally, `ui/`.
 
 ## Quick Start
+
+Fast local demo from the repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
+```
+
+This starts FastAPI at `http://127.0.0.1:8000/docs` and Streamlit at `http://127.0.0.1:8507`. Add `-WithUi` to also start the optional React shell.
 
 ### 1. Backend Environment
 
@@ -209,7 +221,7 @@ npm run dev
 Backend policy smoke tests:
 
 ```powershell
-python -m unittest discover -s tests
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1
 ```
 
 This includes offline API contract tests for the FastAPI boundary and backend policy tests for event/fallback behavior.
@@ -217,9 +229,7 @@ This includes offline API contract tests for the FastAPI boundary and backend po
 UI tests and build:
 
 ```powershell
-cd ui
-npm run test
-npm run build
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -WithUi
 ```
 
 ## Hackathon Tradeoffs
