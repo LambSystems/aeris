@@ -77,9 +77,14 @@ docs/
   architecture.md                     Current system design
   trash-model.md                      Custom model training record
   system-audit.md                     Portfolio-readiness audit
+
+archive/legacy-ui/
+  frontend/                           Earlier Vite/React experiment
+  aeirs-ui/                           Earlier Next.js experiment
+  aeris-ui-scratch/                   Scratch workspace notes only
 ```
 
-`frontend/`, `aeirs-ui/`, and `aeris ui/` are earlier UI experiments kept for provenance and labeled as legacy in their local README files. The current maintained UI paths are `backend/streamlit_app.py` and, optionally, `ui/`.
+Earlier UI experiments are archived under `archive/legacy-ui/` for provenance. The current maintained UI paths are `backend/streamlit_app.py` and, optionally, `ui/`.
 
 ## Quick Start
 

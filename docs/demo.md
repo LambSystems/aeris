@@ -38,7 +38,7 @@ Keep the scene simple. One object at a time is better than a cluttered scene.
 cd C:\Users\akuma\repos\aeris
 conda activate aeris-backend
 $env:PYTHONPATH="backend"
-python -m uvicorn app.main:app --reload --app-dir backend
+python -m uvicorn app.main:app --reload --app-dir backend --host 127.0.0.1 --port 8000
 ```
 
 ### Terminal 2 - Streamlit YOLO
@@ -46,24 +46,32 @@ python -m uvicorn app.main:app --reload --app-dir backend
 ```powershell
 cd C:\Users\akuma\repos\aeris\backend
 conda activate aeris-backend
-$env:AERIS_STREAMLIT_EMBED="1"
 $env:YOLO_MODEL_PATH="C:\Users\akuma\repos\aeris\backend\models\trash-quick-v4-best.pt"
 $env:YOLO_DEVICE="0"
 $env:AERIS_CAMERA_WIDTH="960"
 $env:AERIS_CAMERA_HEIGHT="540"
 $env:YOLO_FRAME_SKIP="1"
 $env:YOLO_IMGSZ="320"
-python -m streamlit run streamlit_app.py --server.port 8501
-```
-
-### Terminal 3 - React
-
-```powershell
-cd C:\Users\akuma\repos\aeris\ui
-npm run dev
+python -m streamlit run streamlit_app.py --server.address 127.0.0.1 --server.port 8507
 ```
 
 Open:
+
+```text
+Streamlit: http://127.0.0.1:8507
+FastAPI:   http://127.0.0.1:8000/docs
+```
+
+### Optional Terminal 3 - React Shell
+
+```powershell
+cd C:\Users\akuma\repos\aeris\ui
+$env:VITE_VISION_PROVIDER="streamlit-embed"
+$env:VITE_STREAMLIT_URL="http://127.0.0.1:8507"
+npm run dev
+```
+
+Open the optional React shell at:
 
 ```text
 http://localhost:5173
@@ -74,13 +82,13 @@ http://localhost:5173
 ## Pre-Demo Checklist
 
 1. `http://localhost:8000/health` returns ok.
-2. `http://localhost:5173` loads the Aeris UI.
+2. `http://127.0.0.1:8507` loads the Streamlit scanner.
 3. Browser allows camera access.
-4. Streamlit iframe shows the camera.
+4. Streamlit shows the camera.
 5. YOLO draws a box around can/bottle/paper.
-6. Right sidebar shows fixed context.
-7. Right sidebar changes from "Waiting for detection" to the detected object.
-8. Recommendation card fills in after the first actionable detection.
+6. Side panel shows fixed context.
+7. Side panel changes from waiting/scanning to the detected object.
+8. Recommendation fills in after the first actionable detection.
 
 Manual checks:
 
@@ -150,7 +158,7 @@ $env:AERIS_CAMERA_WIDTH="640"
 $env:AERIS_CAMERA_HEIGHT="360"
 $env:YOLO_FRAME_SKIP="2"
 $env:YOLO_IMGSZ="320"
-python -m streamlit run streamlit_app.py --server.port 8501
+python -m streamlit run streamlit_app.py --server.address 127.0.0.1 --server.port 8507
 ```
 
 Say, if asked:
@@ -216,4 +224,4 @@ Streamlit must be restarted after changing PyTorch/GPU setup.
 
 ## One-Sentence Demo Summary
 
-**Aeris embeds live YOLO vision in a React interface, then uses FastAPI to combine the latest detection with CASTNET/weather context and produce a practical sustainability recommendation.**
+**Aeris runs live YOLO vision in Streamlit, then uses FastAPI-backed environmental context plus cached LLM/fallback advice to produce a practical sustainability recommendation.**

@@ -7,24 +7,25 @@ This is the fastest handoff for the team after the overnight changes.
 The stable demo path is:
 
 ```text
-React UI in /ui
-  -> embeds Streamlit YOLO at http://localhost:8501?embed=true
-  -> polls FastAPI for latest YOLO detection
-  -> calls FastAPI for fixed context and advice
-
 Streamlit in /backend
   -> owns the camera feed
   -> runs YOLO .pt weights with PyTorch CUDA
   -> draws boxes directly on the video
   -> writes the latest actionable detection to .tmp/vision/latest_detection.json
+  -> displays context and advice beside the stream
 
 FastAPI in /backend/app
   -> reads latest Streamlit detection
   -> loads CASTNET/weather/air-quality context
   -> returns cached LLM/fallback recommendation
+
+Optional React UI in /ui
+  -> can embed Streamlit
+  -> polls FastAPI for latest YOLO detection
+  -> calls FastAPI for fixed context and advice
 ```
 
-This branch favors demo stability over architectural purity. Browser YOLO was tested but felt slower/stickier than Streamlit + GPU.
+The current portfolio path favors demo stability over architectural purity. Browser YOLO was tested but felt slower/stickier than Streamlit + GPU.
 
 ---
 
@@ -34,29 +35,34 @@ This branch favors demo stability over architectural purity. Browser YOLO was te
 - CASTNET-backed fixed context for Bondville/Galesburg-like demo coordinates.
 - Weather, air quality, and weather alerts through lightweight public APIs.
 - YOLO live detection in Streamlit using Gallo's `.pt` model.
-- Streamlit iframe embedded inside the React/Lovable UI.
-- React sidebar displays environmental context.
-- React sidebar can now display latest Streamlit detection and recommendation through `/vision/latest-detection`.
+- Streamlit side panel displays environmental context and recommendation.
+- Optional React shell can display latest Streamlit detection and recommendation through `/vision/latest-detection`.
 - Advice uses Gemini first when configured, Anthropic second, deterministic fallback always.
 - Advice is cached by object/site/date/risk flags to avoid flooding the LLM.
 
 ---
 
-## Current Branch Strategy
+## Repository Shape
 
-Main working demo branch:
-
-```text
-piero/iframe
-```
-
-Experimental branch:
+Maintained paths:
 
 ```text
-piero/yolo-browser
+backend/
+ui/
+docs/
+tests/
+data/
+assets/
+scripts/
 ```
 
-Do not switch the team to browser YOLO unless Streamlit becomes unusable. The browser version can run ONNX but was CPU/WASM-bound in testing.
+Legacy UI experiments live under:
+
+```text
+archive/legacy-ui/
+```
+
+Do not switch the main demo to browser YOLO unless Streamlit becomes unusable. The browser version can run ONNX but was CPU/WASM-bound in testing.
 
 ---
 
@@ -86,7 +92,7 @@ Tiny bridge between Streamlit and FastAPI. Streamlit writes latest actionable de
 backend/streamlit_app.py
 ```
 
-Live camera + YOLO + iframe embed CSS + latest detection publishing.
+Live camera + YOLO + side-panel context/advice + latest detection publishing.
 
 ```text
 backend/app/sustainability/adviser.py
@@ -100,13 +106,13 @@ backend/app/context/fixed_context_service.py
 
 Combines GPS/default location with CASTNET, weather, air quality, and weather alerts.
 
-### Frontend
+### Optional React Shell
 
 ```text
 ui/src/pages/Index.tsx
 ```
 
-Main UI. In `streamlit-embed` mode it embeds Streamlit and polls `/vision/latest-detection`.
+Optional UI. In `streamlit-embed` mode it embeds Streamlit and polls `/vision/latest-detection`.
 
 ```text
 ui/src/components/aeris/DecisionPanel.tsx
@@ -144,20 +150,21 @@ Streamlit YOLO:
 ```powershell
 cd C:\Users\akuma\repos\aeris\backend
 conda activate aeris-backend
-$env:AERIS_STREAMLIT_EMBED="1"
 $env:YOLO_MODEL_PATH="C:\Users\akuma\repos\aeris\backend\models\trash-quick-v4-best.pt"
 $env:YOLO_DEVICE="0"
 $env:AERIS_CAMERA_WIDTH="960"
 $env:AERIS_CAMERA_HEIGHT="540"
 $env:YOLO_FRAME_SKIP="1"
 $env:YOLO_IMGSZ="320"
-python -m streamlit run streamlit_app.py --server.port 8501
+python -m streamlit run streamlit_app.py --server.address 127.0.0.1 --server.port 8507
 ```
 
-React:
+Optional React shell:
 
 ```powershell
 cd C:\Users\akuma\repos\aeris\ui
+$env:VITE_VISION_PROVIDER="streamlit-embed"
+$env:VITE_STREAMLIT_URL="http://127.0.0.1:8507"
 npm run dev
 ```
 
@@ -229,7 +236,7 @@ FastAPI exposes it:
 GET /vision/latest-detection
 ```
 
-React turns it into:
+Streamlit and the optional React shell turn it into:
 
 ```text
 Current scan -> Recommendation
@@ -261,8 +268,8 @@ Technical tradeoff:
 
 ## Known Risks
 
-- Streamlit iframe is not as clean as native React video, but it gives the best local YOLO performance right now.
-- If Streamlit does not detect above threshold, React will not show a recommendation.
+- Streamlit is not as visually customizable as native React video, but it gives the best local YOLO performance right now.
+- If Streamlit does not detect above threshold, no recommendation will appear.
 - If the GPU environment is not active, Streamlit can feel slow.
 - Browser YOLO is not the current demo path.
 
@@ -274,6 +281,6 @@ Technical tradeoff:
 2. `GET /context/fixed?...` returns CASTNET/weather.
 3. Streamlit detects an object and draws a box.
 4. `GET /vision/latest-detection` returns that object.
-5. React sidebar shows Current Scan.
-6. React sidebar shows Recommendation.
+5. Streamlit side panel shows Current Scan.
+6. Streamlit side panel shows Recommendation.
 7. Move can/bottle/paper in camera and confirm the demo narrative still makes sense.

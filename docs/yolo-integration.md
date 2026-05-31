@@ -127,24 +127,20 @@ For the current Aeris custom trash model, training notes and expected accuracy a
 docs/trash-model.md
 ```
 
-## Frontend Usage
+## Maintained UI Usage
 
-Use `scanFrame` from `frontend/src/api.ts`:
+The maintained React shell lives in `ui/`. The older `frontend/` app has been archived under `archive/legacy-ui/` and should be treated as provenance, not the recommended integration path.
+
+Use the scanning helpers in `ui/src/lib/api.ts` and the camera scanner path in `ui/src/hooks/useCameraScanner.ts` when exercising the optional React shell:
 
 ```ts
-import { scanFrame } from "./api";
-import { captureVideoFrame } from "./cameraFrame";
+import { scanFrame } from "@/lib/api";
 
-const captured = await captureVideoFrame(video);
-const dynamicContext = await scanFrame({
-  frame: captured.frame,
-  imageWidth: captured.imageWidth,
-  imageHeight: captured.imageHeight,
-  confidenceThreshold: 0.35,
-});
+const frameBlob = await captureFrameFromVideo(video);
+const dynamicContext = await scanFrame(frameBlob);
 ```
 
-Then send the returned `dynamicContext` to `/analyze-scene`. Do not send every frame. Sample only after user action, meaningful object changes, or a cooldown.
+Then send the returned `dynamicContext` to `/analyze-scene`, or use the Streamlit-first path where Streamlit publishes the latest detection and FastAPI serves `/vision/latest-detection`. Do not send every frame. Sample only after user action, meaningful object changes, or a cooldown.
 
 ## Runtime Settings
 

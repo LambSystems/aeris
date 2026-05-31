@@ -6,7 +6,7 @@ Last updated: 2026-05-30
 
 Aeris is portfolio-viable as a backend orchestration and AI integration project. The strongest story is not "we built an object detector"; it is that the repo connects live detection, environmental context, and resilient recommendation generation into one observable pipeline.
 
-The main readiness gap was repo clarity. The codebase contains several UI experiments and older docs from hackathon iteration, while the current working runtime is Streamlit-first with FastAPI support and an optional React shell.
+The main readiness gap was repo clarity. The current working runtime is Streamlit-first with FastAPI support and an optional React shell; older UI experiments now live under `archive/legacy-ui/` for provenance.
 
 ## Current Working System
 
@@ -50,7 +50,7 @@ Results:
 
 | Area | Risk | Recommended action |
 | --- | --- | --- |
-| UI folders | `frontend/`, `aeirs-ui/`, and `aeris ui/` are legacy workspaces | Move them under an archive folder or remove them after confirming no unique work remains |
+| Legacy UI provenance | `archive/legacy-ui/` preserves older UI experiments and should not be treated as the maintained app | Keep README and architecture docs pointing to `backend/` and `ui/` |
 | Model artifact availability | Preferred `trash-quick-v4-best.pt` is gitignored and may not exist after clone | Document download/placement path, or add a small release artifact link |
 | UI text rendering | Some terminals render Streamlit's decorative Unicode poorly | Keep labels readable if the Streamlit UI is opened in constrained environments |
 | Tests | Backend coverage is useful but still not exhaustive | Add integration checks for live Streamlit detection and real `/scan-frame` image uploads |
@@ -62,7 +62,7 @@ Results:
 1. Documentation and env examples: clarify current architecture, setup, team contributions, and audit status.
 2. Streamlit code polish: keep UI labels professional and make constrained-environment rendering graceful.
 3. API image-scan cleanup: add a fixture-backed `/scan-frame` upload test when model artifact availability is settled.
-4. Legacy folder cleanup: archive old UI experiments after confirming no unique work remains.
+4. Demo polish: add screenshots or a short GIF once the public portfolio presentation is ready.
 
 ## Recruiter Narrative
 
