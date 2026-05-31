@@ -2,13 +2,10 @@
 
 Aeris is a real-time environmental intelligence system built for HackAugie, where it won Best Data Insight. It detects visible waste, normalizes local environmental context, and returns a practical sustainability recommendation that still works when LLM providers are unavailable.
 
-Aeris is not production recycling infrastructure. The portfolio signal is the system design: a clear boundary between vision detections, environmental context, LLM-backed advice, deterministic fallback behavior, and cache-aware backend orchestration.
-
 - Devpost: https://devpost.com/software/aeris-the-environmental-intelligence-system
 - Demo video: https://www.youtube.com/watch?v=41eoB-4JUbs
 - Architecture: [docs/architecture.md](docs/architecture.md)
-- Readiness audit: [docs/system-audit.md](docs/system-audit.md)
-- Primary portfolio angle: backend orchestration across vision, environmental data, LLM advice, fallback policy, and caching
+
 
 ## Review Paths
 
@@ -234,6 +231,7 @@ npm run build
 
 ## Team Contributions
 
+<<<<<<< HEAD
 - [@postigodev](https://github.com/postigodev): FastAPI layer, environmental context integration, recommendation pipeline, LLM/fallback/cache orchestration, and glue between Streamlit/YOLO detections and the rest of the system.
 - [@shuja-waraich-03](https://github.com/shuja-waraich-03): AI integration, real-time synchronization between vision and reasoning, Gemini prompt structure, and live detection validation.
 - [@kacytran1122](https://github.com/kacytran1122): Frontend work, React camera detection, landing page, responsive interaction design, and user experience polish.
@@ -248,3 +246,9 @@ Aeris connects live computer vision, real environmental data, and resilient AI r
 ```
 
 See `docs/system-audit.md` for the current readiness audit and next cleanup targets.
+=======
+- Piero Postigo / @postigodev: FastAPI layer, environmental context integration, recommendation pipeline, LLM/fallback/cache orchestration, and glue between Streamlit/YOLO detections and the rest of the system.
+- Shuja Waraich / @shuja-waraich-03: AI integration, real-time synchronization between vision and reasoning, Gemini prompt structure, and live detection validation.
+- Chau Tran / @kacytran1122: Frontend work, React camera detection, landing page, responsive interaction design, and user experience polish.
+- Galgallo Roba Waqo / @GALGALLOR: Computer vision pipeline, dataset preparation, YOLO fine-tuning, real-time inference performance, and Streamlit integration.
+>>>>>>> ee986c5218b80159d366591ee05ae29fdbc684e1
