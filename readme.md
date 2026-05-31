@@ -4,7 +4,7 @@
 
 Aeris is a real-time environmental intelligence system built for HackAugie, where it won Best Data Insight. It detects visible waste, normalizes local environmental context, and returns a practical sustainability recommendation that still works when LLM providers are unavailable.
 
-**Winner: HackAugie Best Data Insight**
+**🏆 Winner: HackAugie Best Data Insight**
 
 Aeris is not production recycling infrastructure. The portfolio signal is the system design: a clear boundary between vision detections, environmental context, LLM-backed advice, deterministic fallback behavior, and cache-aware backend orchestration.
 
@@ -14,6 +14,8 @@ Aeris is not production recycling infrastructure. The portfolio signal is the sy
 - Local dev setup: [docs/local-dev-setup.md](docs/local-dev-setup.md)
 - License: [MIT](LICENSE)
 
+![Aeris live scanner showing YOLO paper detection, environmental context, and recommendation panel](assets/main.png)
+
 ## Review Paths
 
 | If you are... | Start here |
@@ -22,7 +24,7 @@ Aeris is not production recycling infrastructure. The portfolio signal is the sy
 | An engineer reviewing the system | [docs/architecture.md](docs/architecture.md), [docs/yolo-integration.md](docs/yolo-integration.md), and [tests/](tests/) |
 | Trying to run it locally | `powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1`, then [docs/local-dev-setup.md](docs/local-dev-setup.md) |
 | Looking for model training context | [docs/trash-model.md](docs/trash-model.md) and `backend/scripts/` |
-| Looking for hackathon provenance | [docs/hackaton-context.md](docs/hackaton-context.md) and `archive/legacy-ui/` |
+| Looking for hackathon provenance | [docs/hackathon-context.md](docs/hackathon-context.md) and `archive/legacy-ui/` |
 
 ## What It Does
 
@@ -117,7 +119,7 @@ Earlier UI experiments are archived under `archive/legacy-ui/` for provenance. T
 
 ## Quick Start
 
-Fast local demo from the repo root:
+Install backend/UI dependencies once using [docs/local-dev-setup.md](docs/local-dev-setup.md), then start the local demo from the repo root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
@@ -125,87 +127,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 
 This starts FastAPI at `http://127.0.0.1:8000/docs` and Streamlit at `http://127.0.0.1:8507`. Add `-WithUi` to also start the optional React shell.
 
-### 1. Backend Environment
-
-From the repo root:
-
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-If Python is managed through Conda:
-
-```powershell
-conda create -n aeris-backend python=3.12
-conda activate aeris-backend
-cd backend
-pip install -r requirements.txt
-```
-
-### 2. Configure Optional Secrets
-
-Copy the example file and fill only the keys you want to use:
+Use the root `.env` as the main local configuration file:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Aeris works without LLM keys because the deterministic fallback still returns advice.
-
-### 3. Run FastAPI
-
-From the repo root:
-
-```powershell
-$env:PYTHONPATH="backend"
-python -m uvicorn app.main:app --reload --app-dir backend --host 127.0.0.1 --port 8000
-```
-
-Open:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-### 4. Run Streamlit
-
-From `backend/`:
-
-```powershell
-$env:YOLO_MODEL_PATH = (Resolve-Path ".\models\trash-quick-v4-best.pt").Path
-$env:YOLO_IMGSZ="320"
-$env:YOLO_FRAME_SKIP="2"
-python -m streamlit run streamlit_app.py --server.address 127.0.0.1 --server.port 8507
-```
-
-Open:
-
-```text
-http://127.0.0.1:8507
-```
-
-If the custom checkpoint is not present, Streamlit falls back to bundled YOLO weights. The strongest documented checkpoint is `backend/models/trash-quick-v4-best.pt`; it is intentionally gitignored because model artifacts can be large.
-
-## Optional React Shell
-
-The Vite UI in `ui/` can run as a product shell around the Streamlit scanner or use experimental browser/backend scanning paths.
-
-```powershell
-cd ui
-npm install
-npm run dev
-```
-
-For the Streamlit embed path:
-
-```powershell
-$env:VITE_VISION_PROVIDER="streamlit-embed"
-$env:VITE_STREAMLIT_URL="http://127.0.0.1:8507"
-npm run dev
-```
+Aeris works without LLM keys because deterministic fallback advice remains available. The strongest documented checkpoint is `backend/models/trash-quick-v4-best.pt`; it is intentionally gitignored because model artifacts can be large.
 
 ## Main API Endpoints
 
